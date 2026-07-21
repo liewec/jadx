@@ -7,6 +7,8 @@ import android.os.Bundle;
 import android.provider.DocumentsContract;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.widget.ScrollView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -212,6 +214,7 @@ public class MainActivity extends AppCompatActivity {
         pd.show();
         new Thread(() -> {
             String error = null;
+            String fullTrace = null;
             try { task.run(); }
             catch (Throwable e) {
                 Throwable root = e;
@@ -219,18 +222,56 @@ public class MainActivity extends AppCompatActivity {
                 error = root.getMessage();
                 if (error == null) error = root.getClass().getName();
                 if (error == null) error = e.toString();
+                StringBuilder sb = new StringBuilder();
+                sb.append("Root cause: ").append(root.getClass().getName())
+                        .append(": ").append(root.getMessage()).append("\n\n");
+                sb.append("Full stack trace:\n");
+                java.io.StringWriter sw = new java.io.StringWriter();
+                e.printStackTrace(new java.io.PrintWriter(sw));
+                sb.append(sw.toString());
+                fullTrace = sb.toString();
                 android.util.Log.e("DexEditor", "loadFileAsync failed", e);
             }
             final String finalError = error;
+            final String finalTrace = fullTrace;
             runOnUiThread(() -> {
                 if (pd.isShowing()) pd.dismiss();
                 if (finalError != null) {
-                    Toast.makeText(this, getString(R.string.load_failed, finalError), Toast.LENGTH_LONG).show();
+                    showErrorDialog(finalError, finalTrace);
                     return;
                 }
                 onLoaded();
             });
         }).start();
+    }
+
+    /** 在手机上直接显示错误对话框，不用 adb 也能看到完整堆栈 */
+    private void showErrorDialog(String summary, String fullTrace) {
+        DexEditorApp.setLastError(fullTrace != null ? fullTrace : summary);
+        ScrollView scroll = new ScrollView(this);
+        TextView tv = new TextView(this);
+        tv.setTypeface(android.graphics.Typeface.MONOSPACE);
+        tv.setTextSize(12);
+        tv.setPadding(48, 32, 48, 32);
+        tv.setTextIsSelectable(true);
+        tv.setText(fullTrace != null ? fullTrace : summary);
+        scroll.addView(tv);
+
+        new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle(getString(R.string.load_failed, ""))
+                .setMessage(summary)
+                .setView(scroll)
+                .setPositiveButton("复制", (d, w) -> {
+                    android.content.ClipboardManager cm =
+                            (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                    if (cm != null) {
+                        cm.setPrimaryClip(android.content.ClipData.newPlainText("error", fullTrace));
+                        Toast.makeText(this, "错误信息已复制到剪贴板", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton("关闭", null)
+                .setCancelable(true)
+                .show();
     }
 
     private void onLoaded() {

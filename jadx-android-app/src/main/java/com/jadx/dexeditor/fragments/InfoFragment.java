@@ -1,18 +1,26 @@
 package com.jadx.dexeditor.fragments;
 
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
+import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
 
 import com.android.tools.smali.dexlib2.iface.ClassDef;
 import com.android.tools.smali.dexlib2.iface.DexFile;
 import com.android.tools.smali.dexlib2.iface.MultiDexContainer;
+import com.jadx.dexeditor.DexEditorApp;
 import com.jadx.dexeditor.DexLoader;
 import com.jadx.dexeditor.MainActivity;
 import com.jadx.dexeditor.R;
@@ -37,8 +45,48 @@ public class InfoFragment extends Fragment {
         infoMethodCount = v.findViewById(R.id.info_method_count);
         infoFieldCount = v.findViewById(R.id.info_field_count);
         emptyView = v.findViewById(R.id.empty_view);
+
+        Button btnViewError = v.findViewById(R.id.btn_view_error);
+        Button btnClearError = v.findViewById(R.id.btn_clear_error);
+        btnViewError.setOnClickListener(btn -> showLastError());
+        btnClearError.setOnClickListener(btn -> {
+            DexEditorApp.clearLastError();
+            Toast.makeText(getContext(), "已清除", Toast.LENGTH_SHORT).show();
+        });
+
         refresh();
         return v;
+    }
+
+    /** 显示最近一次错误日志（手机端调试用） */
+    private void showLastError() {
+        String err = DexEditorApp.getLastError();
+        if (err == null || err.isEmpty()) {
+            Toast.makeText(getContext(), "没有错误日志", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        ScrollView scroll = new ScrollView(getContext());
+        TextView tv = new TextView(getContext());
+        tv.setTypeface(android.graphics.Typeface.MONOSPACE);
+        tv.setTextSize(12);
+        tv.setPadding(48, 32, 48, 32);
+        tv.setTextIsSelectable(true);
+        tv.setText(err);
+        scroll.addView(tv);
+
+        new AlertDialog.Builder(requireContext())
+                .setTitle("最近错误日志")
+                .setView(scroll)
+                .setPositiveButton("复制", (d, w) -> {
+                    ClipboardManager cm = (ClipboardManager) requireContext()
+                            .getSystemService(Context.CLIPBOARD_SERVICE);
+                    if (cm != null) {
+                        cm.setPrimaryClip(ClipData.newPlainText("error", err));
+                        Toast.makeText(getContext(), "已复制到剪贴板", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton("关闭", null)
+                .show();
     }
 
     @Override
