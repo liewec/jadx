@@ -32,6 +32,7 @@ public class BrowseFragment extends Fragment {
     private TextView emptyView;
     private ClassTreeAdapter adapter;
     private MainActivity.Host host;
+    private Thread treeWorker;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -77,16 +78,30 @@ public class BrowseFragment extends Fragment {
             showEmpty(getString(R.string.no_file_loaded));
             return;
         }
-        List<ClassNode> roots = buildTree(loader);
-        if (roots.isEmpty()) {
-            showEmpty("No classes found");
-            return;
+        // 取消上一次未完成的构建
+        if (treeWorker != null) {
+            treeWorker.interrupt();
+            treeWorker = null;
         }
-        if (emptyView != null) {
-            emptyView.setVisibility(View.GONE);
-        }
-        classListView.setVisibility(View.VISIBLE);
-        adapter.setData(roots);
+        // 先显示加载提示
+        showEmpty("加载中…");
+        final DexLoader finalLoader = loader;
+        treeWorker = new Thread(() -> {
+            List<ClassNode> roots = buildTree(finalLoader);
+            if (Thread.interrupted()) return;
+            if (getActivity() == null) return;
+            getActivity().runOnUiThread(() -> {
+                if (roots == null || roots.isEmpty()) {
+                    showEmpty("No classes found");
+                    return;
+                }
+                if (emptyView != null) emptyView.setVisibility(View.GONE);
+                classListView.setVisibility(View.VISIBLE);
+                adapter.setData(roots);
+            });
+        });
+        treeWorker.setDaemon(true);
+        treeWorker.start();
     }
 
     private void showEmpty(String msg) {

@@ -93,18 +93,32 @@ public class SmaliFragment extends Fragment {
             if (smaliCode != null) smaliCode.setText(getString(R.string.no_file_loaded));
             return;
         }
-        classDef = findClassDef(loader);
-        if (classDef == null) {
-            if (smaliCode != null) smaliCode.setText("Class not found: " + classType);
-            return;
-        }
-        smaliText = SmaliUtils.disassembleClass(classDef);
         if (smaliTitle != null) {
             smaliTitle.setText(SmaliUtils.simpleName(classType));
         }
-        if (smaliCode != null) {
-            smaliCode.setText(smaliText);
-        }
+        if (smaliCode != null) smaliCode.setText("加载中…");
+        final DexLoader finalLoader = loader;
+        new Thread(() -> {
+            ClassDef cd = findClassDef(finalLoader);
+            if (Thread.interrupted()) return;
+            if (cd == null) {
+                if (getActivity() != null) {
+                    getActivity().runOnUiThread(() -> {
+                        if (smaliCode != null) smaliCode.setText("Class not found: " + classType);
+                    });
+                }
+                return;
+            }
+            final String text = SmaliUtils.disassembleClass(cd);
+            if (Thread.interrupted()) return;
+            classDef = cd;
+            smaliText = text;
+            if (getActivity() != null) {
+                getActivity().runOnUiThread(() -> {
+                    if (smaliCode != null) smaliCode.setText(text);
+                });
+            }
+        }).start();
     }
 
     private ClassDef findClassDef(DexLoader loader) {

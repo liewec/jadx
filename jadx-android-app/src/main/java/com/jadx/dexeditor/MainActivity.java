@@ -32,6 +32,9 @@ import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
 
+    /** 对话框内显示的最大字符数，超过则截断（避免大文本布局/渲染卡死） */
+    private static final int MAX_DIALOG_TEXT = 6000;
+
     public interface Host {
         DexLoader getDexLoader();
         void openClass(String classType);
@@ -210,7 +213,7 @@ public class MainActivity extends AppCompatActivity {
     private void loadFileAsync(Runnable task) {
         ProgressDialog pd = new ProgressDialog(this);
         pd.setMessage(getString(R.string.loading));
-        pd.setCancelable(false);
+        pd.setCancelable(true);
         pd.show();
         new Thread(() -> {
             String error = null;
@@ -233,15 +236,22 @@ public class MainActivity extends AppCompatActivity {
                     showErrorDialog(finalError, finalTrace);
                     return;
                 }
-                try {
-                    onLoaded();
-                } catch (Throwable t) {
-                    String trace = formatError(t);
-                    DexEditorApp.setLastError("onLoaded crashed:\n" + trace);
-                    showErrorDialog(extractSummary(t), trace);
-                }
+                // 把 onLoaded 推到下一帧，避免 ProgressDialog dismiss 与刷新同时进行造成卡顿
+                classListView_post(() -> {
+                    try {
+                        onLoaded();
+                    } catch (Throwable t) {
+                        String trace = formatError(t);
+                        DexEditorApp.setLastError("onLoaded crashed:\n" + trace);
+                        showErrorDialog(extractSummary(t), trace);
+                    }
+                });
             });
         }).start();
+    }
+
+    private void classListView_post(Runnable r) {
+        getWindow().getDecorView().post(r);
     }
 
     private static String formatError(Throwable e) {
@@ -268,14 +278,23 @@ public class MainActivity extends AppCompatActivity {
 
     /** 在手机上直接显示错误对话框，不用 adb 也能看到完整堆栈 */
     private void showErrorDialog(String summary, String fullTrace) {
-        DexEditorApp.setLastError(fullTrace != null ? fullTrace : summary);
+        // 注意：不要在这里再写 setLastError，loadFileAsync 已写过，重复写会触发 SharedPreferences 同步开销
+        final String displayText;
+        final String copyText = fullTrace != null ? fullTrace : summary;
+        if (copyText != null && copyText.length() > MAX_DIALOG_TEXT) {
+            displayText = copyText.substring(0, MAX_DIALOG_TEXT)
+                    + "\n\n…（已截断 " + (copyText.length() - MAX_DIALOG_TEXT)
+                    + " 字符，完整内容请点“复制”）";
+        } else {
+            displayText = copyText;
+        }
         ScrollView scroll = new ScrollView(this);
         TextView tv = new TextView(this);
         tv.setTypeface(android.graphics.Typeface.MONOSPACE);
         tv.setTextSize(12);
         tv.setPadding(48, 32, 48, 32);
-        tv.setTextIsSelectable(true);
-        tv.setText(fullTrace != null ? fullTrace : summary);
+        // setTextIsSelectable(true) 在大文本上会显著拖慢布局测量，这里关闭
+        tv.setText(displayText);
         scroll.addView(tv);
 
         new androidx.appcompat.app.AlertDialog.Builder(this)
@@ -286,8 +305,8 @@ public class MainActivity extends AppCompatActivity {
                     android.content.ClipboardManager cm =
                             (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
                     if (cm != null) {
-                        cm.setPrimaryClip(android.content.ClipData.newPlainText("error", fullTrace));
-                        Toast.makeText(this, "错误信息已复制到剪贴板", Toast.LENGTH_SHORT).show();
+                        cm.setPrimaryClip(android.content.ClipData.newPlainText("error", copyText));
+                        Toast.makeText(this, "完整错误信息已复制到剪贴板", Toast.LENGTH_SHORT).show();
                     }
                 })
                 .setNegativeButton("关闭", null)
