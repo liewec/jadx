@@ -1,14 +1,14 @@
 package com.jadx.dexeditor;
 
-import android.app.ProgressDialog;
-import android.content.Intent;
+import android.content.ContentResolver;
+import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.DocumentsContract;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.widget.ScrollView;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -18,7 +18,6 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
-import androidx.fragment.app.FragmentTransaction;
 
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.jadx.dexeditor.fragments.BrowseFragment;
@@ -29,24 +28,21 @@ import com.jadx.dexeditor.fragments.SmaliFragment;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity {
-
-    /** 对话框内显示的最大字符数，超过则截断（避免大文本布局/渲染卡死） */
-    private static final int MAX_DIALOG_TEXT = 6000;
-
-    public interface Host {
-        DexLoader getDexLoader();
-        void openClass(String classType);
-    }
+    private static final String TAG_BROWSE = "browse";
+    private static final String TAG_INFO = "info";
+    private static final String TAG_SEARCH = "search";
 
     private Toolbar toolbar;
     private BottomNavigationView bottomNav;
-    private final DexLoader dexLoader = new DexLoader(this);
     private BrowseFragment browseFragment;
     private SearchFragment searchFragment;
     private InfoFragment infoFragment;
-    private Fragment activeMainFragment;
+    private Fragment activeFragment;
+    private Thread loadThread;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     private final ActivityResultLauncher<String> openFileLauncher =
             registerForActivityResult(new ActivityResultContracts.GetContent(), uri -> {
@@ -63,41 +59,60 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         toolbar = findViewById(R.id.toolbar);
-        setSupportActionBar(toolbar);
         bottomNav = findViewById(R.id.bottom_nav);
-        bottomNav.setOnItemSelectedListener(item -> {
-            int id = item.getItemId();
-            if (id == R.id.nav_browse) showMainTab(getOrCreateBrowse(), "browse");
-            else if (id == R.id.nav_search) showMainTab(getOrCreateSearch(), "search");
-            else if (id == R.id.nav_info) showMainTab(getOrCreateInfo(), "info");
-            return true;
-        });
+        setSupportActionBar(toolbar);
+
+        getSupportFragmentManager().addOnBackStackChangedListener(this::updateBottomNavVisibility);
+        updateBottomNavVisibility();
+
         if (savedInstanceState == null) {
-            browseFragment = new BrowseFragment();
-            searchFragment = new SearchFragment();
-            infoFragment = new InfoFragment();
-            getSupportFragmentManager().beginTransaction()
-                    .add(R.id.fragment_container, infoFragment, "info").hide(infoFragment)
-                    .add(R.id.fragment_container, searchFragment, "search").hide(searchFragment)
-                    .add(R.id.fragment_container, browseFragment, "browse")
-                    .commitNow();
-            activeMainFragment = browseFragment;
+            setupFragments();
         } else {
             FragmentManager fm = getSupportFragmentManager();
-            browseFragment = (BrowseFragment) fm.findFragmentByTag("browse");
-            searchFragment = (SearchFragment) fm.findFragmentByTag("search");
-            infoFragment = (InfoFragment) fm.findFragmentByTag("info");
-            activeMainFragment = findVisibleMainFragment();
+            browseFragment = (BrowseFragment) fm.findFragmentByTag(TAG_BROWSE);
+            searchFragment = (SearchFragment) fm.findFragmentByTag(TAG_SEARCH);
+            infoFragment = (InfoFragment) fm.findFragmentByTag(TAG_INFO);
+            activeFragment = findVisibleMainFragment();
         }
-        // 处理通过 VIEW intent 打开的文件
+
+        bottomNav.setOnItemSelectedListener(item -> {
+            int id = item.getItemId();
+            if (id == R.id.nav_browse) { switchFragment(browseFragment); return true; }
+            if (id == R.id.nav_search) { switchFragment(searchFragment); return true; }
+            if (id == R.id.nav_info) { switchFragment(infoFragment); return true; }
+            return false;
+        });
+
         if (savedInstanceState == null) {
-            Intent intent = getIntent();
-            if (intent != null) {
-                Uri data = intent.getData();
-                if (data != null) {
-                    loadFromUri(data);
-                }
-            }
+            bottomNav.setSelectedItemId(R.id.nav_browse);
+        }
+        updateToolbarTitle();
+
+        // 让 DexLoader 拿到 Context 以便处理 URI
+        DexLoader.getInstance().init(getApplicationContext());
+    }
+
+    private void setupFragments() {
+        browseFragment = new BrowseFragment();
+        searchFragment = new SearchFragment();
+        infoFragment = new InfoFragment();
+        getSupportFragmentManager().beginTransaction()
+                .add(R.id.fragment_container, browseFragment, TAG_BROWSE)
+                .add(R.id.fragment_container, searchFragment, TAG_SEARCH).hide(searchFragment)
+                .add(R.id.fragment_container, infoFragment, TAG_INFO).hide(infoFragment)
+                .commitNow();
+        activeFragment = browseFragment;
+    }
+
+    private void switchFragment(Fragment target) {
+        if (target == activeFragment) return;
+        getSupportFragmentManager().beginTransaction()
+                .hide(activeFragment)
+                .show(target)
+                .commit();
+        activeFragment = target;
+        if (target instanceof InfoFragment) {
+            ((InfoFragment) target).refresh();
         }
     }
 
@@ -105,39 +120,7 @@ public class MainActivity extends AppCompatActivity {
         if (browseFragment != null && browseFragment.isVisible()) return browseFragment;
         if (searchFragment != null && searchFragment.isVisible()) return searchFragment;
         if (infoFragment != null && infoFragment.isVisible()) return infoFragment;
-        return browseFragment;
-    }
-
-    private BrowseFragment getOrCreateBrowse() {
-        if (browseFragment == null) browseFragment = new BrowseFragment();
-        return browseFragment;
-    }
-
-    private SearchFragment getOrCreateSearch() {
-        if (searchFragment == null) searchFragment = new SearchFragment();
-        return searchFragment;
-    }
-
-    private InfoFragment getOrCreateInfo() {
-        if (infoFragment == null) infoFragment = new InfoFragment();
-        return infoFragment;
-    }
-
-    private void showMainTab(Fragment target, String tag) {
-        FragmentManager fm = getSupportFragmentManager();
-        Fragment existing = fm.findFragmentByTag(tag);
-        FragmentTransaction ft = fm.beginTransaction();
-        if (browseFragment != null && browseFragment != existing) ft.hide(browseFragment);
-        if (searchFragment != null && searchFragment != existing) ft.hide(searchFragment);
-        if (infoFragment != null && infoFragment != existing) ft.hide(infoFragment);
-        SmaliFragment smaliFrag = (SmaliFragment) fm.findFragmentByTag("smali");
-        if (smaliFrag != null) ft.remove(smaliFrag);
-        if (existing == null) ft.add(R.id.fragment_container, target, tag);
-        else ft.show(existing);
-        ft.commitAllowingStateLoss();
-        activeMainFragment = existing == null ? target : existing;
-        if (activeMainFragment instanceof BrowseFragment) ((BrowseFragment) activeMainFragment).refresh();
-        else if (activeMainFragment instanceof InfoFragment) ((InfoFragment) activeMainFragment).refresh();
+        return browseFragment != null ? browseFragment : infoFragment;
     }
 
     @Override
@@ -149,224 +132,169 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         int id = item.getItemId();
-        if (id == R.id.action_open_file) { openFileLauncher.launch("*/*"); return true; }
-        else if (id == R.id.action_open_folder) { openFolderLauncher.launch(null); return true; }
-        else if (id == R.id.action_reload) { reloadCurrent(); return true; }
+        if (id == R.id.action_open_file) {
+            openFileLauncher.launch("*/*");
+            return true;
+        }
+        if (id == R.id.action_open_folder) {
+            openFolderLauncher.launch(null);
+            return true;
+        }
         return super.onOptionsItemSelected(item);
     }
 
-    private void reloadCurrent() {
-        if (!dexLoader.isLoaded()) {
-            Toast.makeText(this, R.string.no_file_loaded, Toast.LENGTH_SHORT).show();
-            return;
-        }
-        File f = dexLoader.getLoadedFile();
-        if (f != null && f.exists()) {
-            loadFileAsync(() -> {
-                try { dexLoader.load(f); } catch (Exception e) { throw new RuntimeException(e); }
-            });
-        }
-    }
-
-    private void loadFromUri(Uri uri) {
-        loadFileAsync(() -> {
-            try { dexLoader.loadFromUri(uri); } catch (Exception e) { throw new RuntimeException(e); }
-        });
-    }
-
-    private void loadFromFolder(Uri folderUri) {
-        loadFileAsync(() -> {
-            List<Uri> dexUris = listDexInTree(folderUri);
-            if (dexUris.isEmpty()) {
-                runOnUiThread(() -> Toast.makeText(this, R.string.no_dex_in_folder, Toast.LENGTH_SHORT).show());
-                return;
+    private void loadFromUri(final Uri uri) {
+        if (loadThread != null && loadThread.isAlive()) return;
+        if (browseFragment != null) browseFragment.setLoading(true);
+        toolbar.setTitle(R.string.loading);
+        loadThread = new Thread(() -> {
+            try {
+                final File loaded = DexLoader.getInstance().loadFromUri(uri);
+                final String name = DexLoader.getInstance().getFileName() != null
+                        ? DexLoader.getInstance().getFileName()
+                        : loaded.getName();
+                final int count = DexLoader.getInstance().getClassCount();
+                mainHandler.post(() -> onLoaded(name,
+                        getString(R.string.loaded_count, count)));
+            } catch (Exception e) {
+                final String msg = e.getMessage();
+                mainHandler.post(() -> onLoadFailed(msg != null ? msg : ""));
             }
-            try { dexLoader.loadMultipleUris(dexUris); } catch (Exception e) { throw new RuntimeException(e); }
         });
+        loadThread.start();
+    }
+
+    private void loadFromFolder(final Uri treeUri) {
+        if (loadThread != null && loadThread.isAlive()) return;
+        if (browseFragment != null) browseFragment.setLoading(true);
+        toolbar.setTitle(R.string.loading);
+        loadThread = new Thread(() -> {
+            try {
+                List<Uri> dexUris = listDexInTree(treeUri);
+                if (dexUris.isEmpty()) {
+                    mainHandler.post(() -> onLoadFailed(getString(R.string.no_dex_in_folder)));
+                    return;
+                }
+                List<File> files = new ArrayList<>();
+                for (Uri u : dexUris) {
+                    files.add(copyUriToCache(u, "dex"));
+                }
+                int fileCount = files.size();
+                int classCount = DexLoader.getInstance().loadMultiple(files);
+                final String toast = getString(R.string.loaded_multiple, fileCount, classCount);
+                mainHandler.post(() -> onLoaded(toast, toast));
+            } catch (Exception e) {
+                final String msg = e.getMessage();
+                mainHandler.post(() -> onLoadFailed(msg != null ? msg : ""));
+            }
+        });
+        loadThread.start();
+    }
+
+    private File copyUriToCache(Uri uri, String ext) throws java.io.IOException {
+        String suffix = (ext == null || ext.isEmpty()) ? ".dex" : "." + ext;
+        File outFile = File.createTempFile("loaded_", suffix, getCacheDir());
+        try (java.io.InputStream in = getContentResolver().openInputStream(uri);
+             java.io.OutputStream out = new java.io.FileOutputStream(outFile)) {
+            if (in == null) throw new java.io.IOException(getString(R.string.open_failed));
+            byte[] buffer = new byte[8192];
+            int read;
+            while ((read = in.read(buffer)) != -1) {
+                out.write(buffer, 0, read);
+            }
+        }
+        return outFile;
     }
 
     private List<Uri> listDexInTree(Uri treeUri) {
         List<Uri> result = new ArrayList<>();
-        try {
-            Uri childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
-                    treeUri, DocumentsContract.getTreeDocumentId(treeUri));
-            android.database.Cursor cursor = getContentResolver().query(
-                    childrenUri, new String[]{DocumentsContract.Document.COLUMN_DOCUMENT_ID,
-                            DocumentsContract.Document.COLUMN_DISPLAY_NAME}, null, null, null);
-            if (cursor != null) {
+        ContentResolver resolver = getContentResolver();
+        Uri childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
+                treeUri, DocumentsContract.getTreeDocumentId(treeUri));
+        Cursor cursor = resolver.query(childrenUri,
+                new String[]{"document_id", "_display_name"}, null, null, null);
+        if (cursor != null) {
+            while (cursor.moveToNext()) {
                 try {
-                    while (cursor.moveToNext()) {
-                        String docId = cursor.getString(0);
-                        String name = cursor.getString(1);
-                        if (name != null && name.toLowerCase().endsWith(".dex")) {
-                            result.add(DocumentsContract.buildDocumentUriUsingTree(treeUri, docId));
-                        }
+                    String docId = cursor.getString(0);
+                    String name = cursor.getString(1);
+                    if (name != null && name.toLowerCase(Locale.ROOT).endsWith(".dex")) {
+                        result.add(DocumentsContract.buildDocumentUriUsingTree(treeUri, docId));
                     }
-                } finally { cursor.close(); }
+                } catch (Throwable ignored) {
+                }
             }
-        } catch (Throwable e) {
-            Toast.makeText(this, "list dex failed: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            cursor.close();
         }
         return result;
     }
 
-    private void loadFileAsync(Runnable task) {
-        ProgressDialog pd = new ProgressDialog(this);
-        pd.setMessage(getString(R.string.loading));
-        pd.setCancelable(true);
-        pd.show();
-        new Thread(() -> {
-            String error = null;
-            String fullTrace = null;
-            try {
-                task.run();
-            } catch (Throwable e) {
-                fullTrace = formatError(e);
-                error = extractSummary(e);
-                DexEditorApp.setLastError(fullTrace);
-                android.util.Log.e("DexEditor", "loadFileAsync failed", e);
-            }
-            final String finalError = error;
-            final String finalTrace = fullTrace;
-            runOnUiThread(() -> {
-                try {
-                    if (pd.isShowing()) pd.dismiss();
-                } catch (Throwable ignored) {}
-                if (finalError != null) {
-                    showErrorDialog(finalError, finalTrace);
-                    return;
-                }
-                try {
-                    onLoaded();
-                } catch (Throwable t) {
-                    String trace = formatError(t);
-                    DexEditorApp.setLastError("onLoaded crashed:\n" + trace);
-                    showErrorDialog(extractSummary(t), trace);
-                }
-            });
-        }).start();
-    }
-
-    private static String formatError(Throwable e) {
-        StringBuilder sb = new StringBuilder();
-        Throwable root = e;
-        while (root.getCause() != null && root.getCause() != root) root = root.getCause();
-        sb.append("Root cause: ").append(root.getClass().getName())
-                .append(": ").append(root.getMessage()).append("\n\n");
-        sb.append("Full stack trace:\n");
-        java.io.StringWriter sw = new java.io.StringWriter();
-        e.printStackTrace(new java.io.PrintWriter(sw));
-        sb.append(sw.toString());
-        return sb.toString();
-    }
-
-    private static String extractSummary(Throwable e) {
-        Throwable root = e;
-        while (root.getCause() != null && root.getCause() != root) root = root.getCause();
-        String msg = root.getMessage();
-        if (msg == null) msg = root.getClass().getName();
-        if (msg == null) msg = e.toString();
-        return msg;
-    }
-
-    /** 在手机上直接显示错误对话框，不用 adb 也能看到完整堆栈 */
-    private void showErrorDialog(String summary, String fullTrace) {
-        // 注意：不要在这里再写 setLastError，loadFileAsync 已写过，重复写会触发 SharedPreferences 同步开销
-        final String displayText;
-        final String copyText = fullTrace != null ? fullTrace : summary;
-        if (copyText != null && copyText.length() > MAX_DIALOG_TEXT) {
-            displayText = copyText.substring(0, MAX_DIALOG_TEXT)
-                    + "\n\n…（已截断 " + (copyText.length() - MAX_DIALOG_TEXT)
-                    + " 字符，完整内容请点“复制”）";
-        } else {
-            displayText = copyText;
+    private void onLoaded(String title, String toast) {
+        if (isFinishing()) return;
+        toolbar.setTitle(title);
+        if (browseFragment != null) {
+            browseFragment.setLoading(false);
+            browseFragment.refresh();
         }
-        ScrollView scroll = new ScrollView(this);
-        TextView tv = new TextView(this);
-        tv.setTypeface(android.graphics.Typeface.MONOSPACE);
-        tv.setTextSize(12);
-        tv.setPadding(48, 32, 48, 32);
-        // setTextIsSelectable(true) 在大文本上会显著拖慢布局测量，这里关闭
-        tv.setText(displayText);
-        scroll.addView(tv);
-
-        new androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle(getString(R.string.load_failed, ""))
-                .setMessage(summary)
-                .setView(scroll)
-                .setPositiveButton("保存到文件", (d, w) -> {
-                    // 在子线程写文件，避免大文本 IO 阻塞 UI
-                    final String textToSave = copyText;
-                    new Thread(() -> {
-                        final File saved = DexEditorApp.saveErrorLogToFile(textToSave);
-                        runOnUiThread(() -> {
-                            if (saved != null) {
-                                Toast.makeText(this,
-                                        "已保存：" + saved.getAbsolutePath(),
-                                        Toast.LENGTH_LONG).show();
-                            } else {
-                                Toast.makeText(this,
-                                        "保存失败（无法写入存储）",
-                                        Toast.LENGTH_SHORT).show();
-                            }
-                        });
-                    }).start();
-                })
-                .setNegativeButton("关闭", null)
-                .setCancelable(true)
-                .show();
-    }
-
-    private void onLoaded() {
-        SmaliUtils.clearCache();
-        if (searchFragment != null) searchFragment.clearResults();
-        // 加载完成后无论当前 Tab 是哪个，都强制刷新 browse 和 info，
-        // 否则当 activeMainFragment 不是 BrowseFragment 时类列表不会刷新。
-        android.util.Log.i("MainActivity", "onLoaded: browseFragment="
-                + (browseFragment != null) + " infoFragment=" + (infoFragment != null)
-                + " isLoaded=" + dexLoader.isLoaded()
-                + " container=" + (dexLoader.getContainer() != null));
-        if (browseFragment != null) browseFragment.refresh();
         if (infoFragment != null) infoFragment.refresh();
-        toolbar.setSubtitle(dexLoader.getDisplayName());
-        // 诊断 Toast：让用户在手机上也能看到加载状态
-        int entries = 0;
-        if (dexLoader.getContainer() != null) {
-            try {
-                entries = dexLoader.getContainer().getDexEntryNames().size();
-            } catch (Throwable ignored) {}
-        }
-        Toast.makeText(this,
-                "Loaded: " + dexLoader.getDisplayName()
-                        + " (entries=" + entries + ")",
-                Toast.LENGTH_LONG).show();
+        if (searchFragment != null) searchFragment.clearResults();
+        Fragment visible = findVisibleMainFragment();
+        if (visible instanceof InfoFragment) ((InfoFragment) visible).refresh();
+        else if (visible instanceof BrowseFragment) ((BrowseFragment) visible).refresh();
+        showToast(toast);
     }
 
-    public DexLoader getDexLoader() { return dexLoader; }
+    private void onLoadFailed(String message) {
+        if (isFinishing()) return;
+        toolbar.setTitle(R.string.no_file_selected);
+        if (browseFragment != null) {
+            browseFragment.setLoading(false);
+            browseFragment.refresh();
+        }
+        showToast(getString(R.string.load_error_prefix) + message);
+    }
+
+    private void updateToolbarTitle() {
+        if (DexLoader.getInstance().isLoaded() && DexLoader.getInstance().getFileName() != null) {
+            toolbar.setTitle(DexLoader.getInstance().getFileName());
+        } else {
+            toolbar.setTitle(R.string.no_file_selected);
+        }
+    }
 
     public void openClass(String classType) {
-        if (classType == null) return;
-        SmaliFragment frag = new SmaliFragment();
-        Bundle args = new Bundle();
-        args.putString(SmaliFragment.ARG_CLASS_TYPE, classType);
-        frag.setArguments(args);
         getSupportFragmentManager().beginTransaction()
-                .setReorderingAllowed(true)
-                .hide(activeMainFragment == null ? browseFragment : activeMainFragment)
-                .add(R.id.fragment_container, frag, "smali")
-                .addToBackStack("smali")
-                .commitAllowingStateLoss();
+                .hide(activeFragment)
+                .add(R.id.fragment_container, SmaliFragment.newInstance(classType), "smali")
+                .addToBackStack(null)
+                .commit();
+    }
+
+    private void updateBottomNavVisibility() {
+        FragmentManager fm = getSupportFragmentManager();
+        boolean smaliOnTop = fm.getBackStackEntryCount() > 0;
+        bottomNav.setVisibility(smaliOnTop ? android.view.View.GONE : android.view.View.VISIBLE);
+    }
+
+    public void showToast(String message) {
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
     }
 
     @Override
     public void onBackPressed() {
         FragmentManager fm = getSupportFragmentManager();
-        SmaliFragment smaliFrag = (SmaliFragment) fm.findFragmentByTag("smali");
-        if (smaliFrag != null && smaliFrag.isVisible()) {
-            fm.popBackStack("smali", FragmentManager.POP_BACK_STACK_INCLUSIVE);
-            if (activeMainFragment != null) fm.beginTransaction().show(activeMainFragment).commitAllowingStateLoss();
-            return;
+        if (fm.getBackStackEntryCount() > 0) {
+            fm.popBackStack();
+        } else {
+            super.onBackPressed();
         }
-        super.onBackPressed();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (loadThread != null) {
+            loadThread.interrupt();
+        }
     }
 }

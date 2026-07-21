@@ -3,6 +3,7 @@ package com.jadx.dexeditor.adapter;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -13,88 +14,106 @@ import com.jadx.dexeditor.model.ClassNode;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Consumer;
 
 public class ClassTreeAdapter extends RecyclerView.Adapter<ClassTreeAdapter.ViewHolder> {
 
-    private static class FlatItem {
-        final ClassNode node;
-        final int depth;
+    public interface OnNodeClickListener {
+        void onClassClicked(String classType);
 
-        FlatItem(ClassNode node, int depth) {
-            this.node = node;
-            this.depth = depth;
-        }
+        boolean onClassLongClicked(String classType, String displayName);
     }
 
-    private final List<FlatItem> flatItems = new ArrayList<>();
-    private Consumer<String> onClassClickListener;
+    private final OnNodeClickListener listener;
+    private ClassNode root;
+    private final List<ClassNode> visible = new ArrayList<>();
 
-    @NonNull
-    @Override
-    public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View v = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_class_node, parent, false);
-        return new ViewHolder(v);
+    public ClassTreeAdapter(OnNodeClickListener listener) {
+        this.listener = listener;
     }
 
-    @Override
-    public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-        FlatItem item = flatItems.get(position);
-        holder.bind(item.node, item.depth);
+    public void setRoot(ClassNode root) {
+        this.root = root;
+        rebuild();
     }
 
-    @Override
-    public int getItemCount() {
-        return flatItems.size();
-    }
-
-    public void setData(List<ClassNode> roots) {
-        flatItems.clear();
-        if (roots != null) {
-            for (ClassNode root : roots) {
-                flatten(root, 0);
-            }
+    public void rebuild() {
+        visible.clear();
+        if (root != null) {
+            flatten(root);
         }
         notifyDataSetChanged();
     }
 
-    private void flatten(ClassNode node, int depth) {
-        flatItems.add(new FlatItem(node, depth));
-        for (ClassNode child : node.getChildren()) {
-            flatten(child, depth + 1);
+    private void flatten(ClassNode node) {
+        for (int i = 0; i < node.getChildren().size(); i++) {
+            ClassNode child = node.getChildren().get(i);
+            visible.add(child);
+            if (child.isPackage() && child.isExpanded()) {
+                flatten(child);
+            }
         }
     }
 
-    public void setOnClassClickListener(Consumer<String> listener) {
-        this.onClassClickListener = listener;
+    @NonNull
+    @Override
+    public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_class_tree, parent, false);
+        return new ViewHolder(view);
+    }
+
+    @Override
+    public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
+        ClassNode node = visible.get(position);
+        holder.bind(node);
+    }
+
+    @Override
+    public int getItemCount() {
+        return visible.size();
     }
 
     class ViewHolder extends RecyclerView.ViewHolder {
+        final ImageView icon;
         final TextView text;
 
         ViewHolder(@NonNull View itemView) {
             super(itemView);
-            TextView tv = itemView.findViewById(R.id.class_node_text);
-            if (tv == null && itemView instanceof TextView) {
-                tv = (TextView) itemView;
-            }
-            this.text = tv;
+            icon = itemView.findViewById(R.id.item_icon);
+            text = itemView.findViewById(R.id.item_text);
         }
 
-        void bind(ClassNode node, int depth) {
-            if (text == null) {
-                return;
-            }
-            text.setText(node.getSimpleName());
-            int pad = depth * 32 + 16;
-            text.setPadding(pad, text.getPaddingTop(), text.getPaddingRight(), text.getPaddingBottom());
-            text.setOnClickListener(v -> {
-                if (onClassClickListener != null && node.getClassDef() != null) {
-                    String type = node.getType();
-                    if (type != null) {
-                        onClassClickListener.accept(type);
-                    }
+        void bind(final ClassNode node) {
+            String string;
+            int indent = node.getDepth() * 24;
+            text.setPadding(indent, text.getPaddingTop(), 0, text.getPaddingBottom());
+            if (node.isPackage()) {
+                icon.setImageResource(node.isExpanded() ? R.drawable.ic_folder_open : R.drawable.ic_folder);
+                icon.setColorFilter(itemView.getContext().getColor(R.color.package_icon));
+                int count = node.countClasses();
+                if (node.getName().isEmpty()) {
+                    string = itemView.getContext().getString(R.string.default_package);
+                } else {
+                    string = node.getName() + "  (" + count + ")";
                 }
+                text.setText(string);
+            } else {
+                icon.setImageResource(R.drawable.ic_class);
+                icon.setColorFilter(itemView.getContext().getColor(R.color.class_icon));
+                text.setText(node.getName());
+            }
+            itemView.setOnClickListener(v -> {
+                if (node.isPackage()) {
+                    node.setExpanded(!node.isExpanded());
+                    ClassTreeAdapter.this.rebuild();
+                } else if (listener != null) {
+                    listener.onClassClicked(node.getClassType());
+                }
+            });
+            itemView.setOnLongClickListener(v -> {
+                if (node.isClass() && listener != null) {
+                    return listener.onClassLongClicked(node.getClassType(), node.getName());
+                }
+                return false;
             });
         }
     }

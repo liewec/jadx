@@ -1,166 +1,250 @@
 package com.jadx.dexeditor.fragments;
 
-import android.graphics.Typeface;
+import android.app.AlertDialog;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.os.Bundle;
-import android.text.method.ScrollingMovementMethod;
+import android.os.Handler;
+import android.os.Looper;
+import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.CompoundButton;
+import android.widget.EditText;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.ToggleButton;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import com.android.tools.smali.dexlib2.iface.ClassDef;
-import com.android.tools.smali.dexlib2.iface.DexFile;
-import com.android.tools.smali.dexlib2.iface.MultiDexContainer;
 import com.jadx.dexeditor.DexLoader;
-import com.jadx.dexeditor.MainActivity;
 import com.jadx.dexeditor.R;
 import com.jadx.dexeditor.SmaliUtils;
 
 import java.io.File;
-import java.io.FileWriter;
+import java.io.IOException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class SmaliFragment extends Fragment {
     public static final String ARG_CLASS_TYPE = "class_type";
 
-    private TextView smaliCode;
-    private TextView smaliTitle;
-    private Button btnBack;
-    private Button btnSaveSmali;
     private String classType;
-    private ClassDef classDef;
-    private String smaliText;
+    private String cachedSmali;
+    private String cachedJava;
+    private boolean javaMode = false;
+
+    private EditText smaliEdit;
+    private TextView statusText;
+    private ProgressBar progressBar;
+    private Button compileButton;
+    private ToggleButton toggleJava;
+
+    private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+
+    public static SmaliFragment newInstance(String classType) {
+        SmaliFragment fragment = new SmaliFragment();
+        Bundle args = new Bundle();
+        args.putString(ARG_CLASS_TYPE, classType);
+        fragment.setArguments(args);
+        return fragment;
+    }
+
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        Bundle args = getArguments();
+        if (args != null) {
+            classType = args.getString(ARG_CLASS_TYPE);
+        }
+    }
 
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
-        View v = inflater.inflate(R.layout.fragment_smali, container, false);
-        smaliCode = v.findViewById(R.id.smali_code);
-        smaliTitle = v.findViewById(R.id.smali_title);
-        btnBack = v.findViewById(R.id.btn_back);
-        btnSaveSmali = v.findViewById(R.id.btn_save_smali);
+        View view = inflater.inflate(R.layout.fragment_smali, container, false);
+        smaliEdit = view.findViewById(R.id.smali_edit);
+        statusText = view.findViewById(R.id.status_text);
+        progressBar = view.findViewById(R.id.loading_progress);
+        compileButton = view.findViewById(R.id.compile_button);
+        Button copyButton = view.findViewById(R.id.copy_button);
+        toggleJava = view.findViewById(R.id.toggle_java);
 
-        Bundle args = getArguments();
-        if (args != null) {
-            classType = args.getString(ARG_CLASS_TYPE);
-        }
-        if (savedInstanceState != null) {
-            classType = savedInstanceState.getString(ARG_CLASS_TYPE, classType);
-        }
+        compileButton.setOnClickListener(v -> compile());
+        copyButton.setOnClickListener(v -> copyAll());
+        toggleJava.setOnCheckedChangeListener((button, isChecked) -> {
+            if (isChecked) showJava();
+            else showSmali();
+        });
+        loadSmali();
+        return view;
+    }
 
-        if (smaliCode != null) {
-            smaliCode.setTypeface(Typeface.MONOSPACE);
-            smaliCode.setMovementMethod(new ScrollingMovementMethod());
-            smaliCode.setTextIsSelectable(true);
+    private void showSmali() {
+        javaMode = false;
+        compileButton.setVisibility(View.VISIBLE);
+        smaliEdit.setFocusable(true);
+        smaliEdit.setFocusableInTouchMode(true);
+        if (cachedSmali != null) {
+            smaliEdit.setText(cachedSmali);
+            statusText.setText(null);
+        } else {
+            loadSmali();
         }
+    }
 
-        if (btnBack != null) {
-            btnBack.setOnClickListener(btn -> getParentFragmentManager().popBackStack());
+    private void showJava() {
+        javaMode = true;
+        compileButton.setVisibility(View.GONE);
+        smaliEdit.setFocusable(false);
+        smaliEdit.setFocusableInTouchMode(false);
+        if (cachedJava != null) {
+            smaliEdit.setText(cachedJava);
+            statusText.setText(null);
+        } else {
+            loadJava();
         }
+    }
 
-        if (btnSaveSmali != null) {
-            btnSaveSmali.setOnClickListener(btn -> saveSmali());
+    private void loadJava() {
+        if (TextUtils.isEmpty(classType)) {
+            statusText.setText(R.string.disasm_failed);
+            return;
         }
+        progressBar.setVisibility(View.VISIBLE);
+        statusText.setText(R.string.decompiling);
+        final String type = classType;
+        final File dexFile = DexLoader.getInstance().getLoadedFile();
+        executor.execute(() -> {
+            final String code = SmaliUtils.decompileToJava(dexFile, type);
+            mainHandler.post(() -> {
+                if (!isAdded()) return;
+                progressBar.setVisibility(View.GONE);
+                cachedJava = code;
+                smaliEdit.setText(code);
+                statusText.setText(null);
+            });
+        });
+    }
 
-        loadAndShow();
-        return v;
+    private void loadSmali() {
+        if (TextUtils.isEmpty(classType)) {
+            statusText.setText(R.string.disasm_failed);
+            return;
+        }
+        progressBar.setVisibility(View.VISIBLE);
+        statusText.setText(R.string.smali_loading);
+        final String type = classType;
+        executor.execute(() -> {
+            ClassDef cls = DexLoader.getInstance().findClass(type);
+            if (cls == null) {
+                mainHandler.post(() -> {
+                    if (!isAdded()) return;
+                    progressBar.setVisibility(View.GONE);
+                    statusText.setText(R.string.disasm_failed);
+                });
+                return;
+            }
+            try {
+                final String smali = SmaliUtils.disassemble(cls);
+                mainHandler.post(() -> {
+                    if (!isAdded()) return;
+                    progressBar.setVisibility(View.GONE);
+                    cachedSmali = smali;
+                    if (!javaMode) {
+                        smaliEdit.setText(smali);
+                    }
+                    statusText.setText(null);
+                });
+            } catch (final IOException e) {
+                mainHandler.post(() -> {
+                    if (!isAdded()) return;
+                    progressBar.setVisibility(View.GONE);
+                    statusText.setText(getString(R.string.disasm_failed) + e.getMessage());
+                });
+            }
+        });
+    }
+
+    private void compile() {
+        final String smaliCode = smaliEdit.getText().toString();
+        if (smaliCode.isEmpty()) {
+            statusText.setText(R.string.compile_failed);
+            return;
+        }
+        progressBar.setVisibility(View.VISIBLE);
+        statusText.setText(R.string.compiling);
+        executor.execute(() -> {
+            File outDex = new File(requireContext().getCacheDir(),
+                    "compiled_" + sanitizeFileName(classType) + ".dex");
+            final String message;
+            final boolean ok;
+            try {
+                ok = SmaliUtils.compile(smaliCode, outDex.getAbsolutePath());
+                if (ok) {
+                    long size = outDex.exists() ? outDex.length() : 0L;
+                    message = getString(R.string.compile_success) + "\n" + outDex.getAbsolutePath()
+                            + "\n" + getString(R.string.info_file_size) + ": " + size + " 字节";
+                } else {
+                    message = getString(R.string.compile_failed);
+                }
+            } catch (IOException e) {
+                mainHandler.post(() -> {
+                    if (!isAdded()) return;
+                    progressBar.setVisibility(View.GONE);
+                    statusText.setText(R.string.compile_failed);
+                    showResultDialog(getString(R.string.compile_failed) + "\n" + e.getMessage());
+                });
+                return;
+            }
+            mainHandler.post(() -> {
+                if (!isAdded()) return;
+                progressBar.setVisibility(View.GONE);
+                statusText.setText(ok ? R.string.compile_success : R.string.compile_failed);
+                showResultDialog(message);
+            });
+        });
+    }
+
+    private void copyAll() {
+        Context ctx = getContext();
+        if (ctx == null) return;
+        ClipboardManager cm = (ClipboardManager) ctx.getSystemService(Context.CLIPBOARD_SERVICE);
+        if (cm != null) {
+            cm.setPrimaryClip(ClipData.newPlainText("smali", smaliEdit.getText().toString()));
+        }
+        Toast.makeText(ctx, R.string.copy_success, Toast.LENGTH_SHORT).show();
+    }
+
+    private void showResultDialog(String message) {
+        new AlertDialog.Builder(requireContext())
+                .setTitle(R.string.compile_button)
+                .setMessage(message)
+                .setPositiveButton(android.R.string.ok, null)
+                .show();
+    }
+
+    private static String sanitizeFileName(String type) {
+        if (type == null) return "class";
+        String s = type;
+        if (s.startsWith("L") && s.endsWith(";")) {
+            s = s.substring(1, s.length() - 1);
+        }
+        return s.replace('/', '.').replace('$', '_').replace('.', '_');
     }
 
     @Override
-    public void onSaveInstanceState(@NonNull Bundle outState) {
-        super.onSaveInstanceState(outState);
-        if (classType != null) {
-            outState.putString(ARG_CLASS_TYPE, classType);
-        }
-    }
-
-    private void loadAndShow() {
-        if (classType == null) {
-            if (smaliCode != null) smaliCode.setText("No class specified");
-            return;
-        }
-        DexLoader loader = null;
-        if (getActivity() instanceof MainActivity.Host) {
-            loader = ((MainActivity.Host) getActivity()).getDexLoader();
-        }
-        if (loader == null || !loader.isLoaded()) {
-            if (smaliCode != null) smaliCode.setText(getString(R.string.no_file_loaded));
-            return;
-        }
-        if (smaliTitle != null) {
-            smaliTitle.setText(SmaliUtils.simpleName(classType));
-        }
-        if (smaliCode != null) smaliCode.setText("加载中…");
-        final DexLoader finalLoader = loader;
-        new Thread(() -> {
-            ClassDef cd = findClassDef(finalLoader);
-            if (Thread.interrupted()) return;
-            if (cd == null) {
-                if (getActivity() != null) {
-                    getActivity().runOnUiThread(() -> {
-                        if (smaliCode != null) smaliCode.setText("Class not found: " + classType);
-                    });
-                }
-                return;
-            }
-            final String text = SmaliUtils.disassembleClass(cd);
-            if (Thread.interrupted()) return;
-            classDef = cd;
-            smaliText = text;
-            if (getActivity() != null) {
-                getActivity().runOnUiThread(() -> {
-                    if (smaliCode != null) smaliCode.setText(text);
-                });
-            }
-        }).start();
-    }
-
-    private ClassDef findClassDef(DexLoader loader) {
-        MultiDexContainer<? extends DexFile> container = loader.getContainer();
-        if (container == null) {
-            return null;
-        }
-        try {
-            for (String entryName : container.getDexEntryNames()) {
-                MultiDexContainer.DexEntry<? extends DexFile> entry = container.getEntry(entryName);
-                if (entry == null) {
-                    continue;
-                }
-                DexFile dex = entry.getDexFile();
-                for (ClassDef cd : dex.getClasses()) {
-                    if (classType.equals(cd.getType())) {
-                        return cd;
-                    }
-                }
-            }
-        } catch (Throwable ignored) {
-        }
-        return null;
-    }
-
-    private void saveSmali() {
-        if (smaliText == null || smaliText.isEmpty()) {
-            Toast.makeText(getContext(), "Nothing to save", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        String name = classType == null ? "class" : SmaliUtils.simpleName(classType);
-        File outDir = getContext() == null ? null : getContext().getCacheDir();
-        if (outDir == null) {
-            Toast.makeText(getContext(), "No cache dir", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        File outFile = new File(outDir, name + ".smali");
-        try (FileWriter fw = new FileWriter(outFile)) {
-            fw.write(smaliText);
-            Toast.makeText(getContext(), "Saved: " + outFile.getAbsolutePath(), Toast.LENGTH_LONG).show();
-        } catch (Exception e) {
-            Toast.makeText(getContext(), "Save failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
-        }
+    public void onDestroy() {
+        super.onDestroy();
+        executor.shutdownNow();
     }
 }

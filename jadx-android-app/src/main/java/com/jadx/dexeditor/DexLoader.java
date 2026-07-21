@@ -6,253 +6,515 @@ import android.util.Log;
 
 import com.android.tools.smali.dexlib2.DexFileFactory;
 import com.android.tools.smali.dexlib2.Opcodes;
-import com.android.tools.smali.dexlib2.iface.DexFile;
+import com.android.tools.smali.dexlib2.dexbacked.DexBackedDexFile;
+import com.android.tools.smali.dexlib2.iface.ClassDef;
+import com.android.tools.smali.dexlib2.iface.Field;
+import com.android.tools.smali.dexlib2.iface.Method;
+import com.android.tools.smali.dexlib2.iface.MethodImplementation;
+import com.android.tools.smali.dexlib2.iface.MethodParameter;
 import com.android.tools.smali.dexlib2.iface.MultiDexContainer;
+import com.android.tools.smali.dexlib2.iface.instruction.Instruction;
+import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction;
+import com.android.tools.smali.dexlib2.iface.reference.Reference;
+import com.android.tools.smali.dexlib2.iface.reference.StringReference;
+import com.jadx.dexeditor.model.ClassNode;
+import com.jadx.dexeditor.model.SearchResult;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 
-public class DexLoader {
+public final class DexLoader {
     private static final String TAG = "DexLoader";
-    private final Context context;
-    private File loadedFile;
-    private MultiDexContainer<? extends DexFile> container;
-    private String displayName;
+    private static volatile DexLoader instance;
 
-    public DexLoader(Context context) {
-        this.context = context;
+    private final Object lock = new Object();
+    private final List<DexBackedDexFile> dexFiles = new ArrayList<>();
+    private final List<ClassDef> classes = new ArrayList<>();
+    private final Map<String, ClassDef> classMap = new LinkedHashMap<>();
+
+    private volatile boolean loaded = false;
+    private volatile String fileName;
+    private volatile long fileSize;
+    private volatile File loadedFile;
+    private volatile int dexCount;
+    private volatile int methodCount;
+    private volatile int fieldCount;
+    private volatile int stringCount;
+    private volatile int packageCount;
+    private volatile ClassNode root;
+
+    private Context context;
+
+    private DexLoader() {
+    }
+
+    public static DexLoader getInstance() {
+        if (instance == null) {
+            synchronized (DexLoader.class) {
+                if (instance == null) {
+                    instance = new DexLoader();
+                }
+            }
+        }
+        return instance;
+    }
+
+    /** 注入 Context 用于 URI 复制，可空 */
+    public void init(Context ctx) {
+        this.context = ctx != null ? ctx.getApplicationContext() : null;
     }
 
     public boolean isLoaded() {
-        return container != null;
+        return loaded;
+    }
+
+    public String getFileName() {
+        return fileName;
+    }
+
+    public long getFileSize() {
+        return fileSize;
+    }
+
+    public int getDexCount() {
+        return dexCount;
     }
 
     public File getLoadedFile() {
         return loadedFile;
     }
 
-    public MultiDexContainer<? extends DexFile> getContainer() {
-        return container;
+    public List<ClassDef> getClasses() {
+        synchronized (lock) {
+            return classes;
+        }
     }
 
-    public String getDisplayName() {
-        return displayName;
+    public ClassNode getRoot() {
+        return root;
     }
 
-    public void load(File file) throws Exception {
-        Log.i(TAG, "Loading file: " + file + " size=" + file.length());
-        String name = file.getName().toLowerCase(Locale.US);
-        MultiDexContainer<? extends DexFile> c;
-        try {
-            c = DexFileFactory.loadDexContainer(file, (Opcodes) null);
-            List<String> entries = c.getDexEntryNames();
-            Log.i(TAG, "loadDexContainer OK, entries=" + entries);
-            if (entries.isEmpty()) {
-                throw new IllegalStateException("File contains no DEX entries: " + file.getName());
-            }
-            // 修正 entry 名：单 .dex 文件被加载时 entry 名是绝对路径，改为简单文件名
-            if (entries.size() == 1 && name.endsWith(".dex")) {
-                MultiDexContainer.DexEntry<? extends DexFile> e = c.getEntry(entries.get(0));
-                if (e != null) {
-                    c = new SingleDexContainer(e.getDexFile(), file.getName());
+    public int getMethodCount() {
+        return methodCount;
+    }
+
+    public int getFieldCount() {
+        return fieldCount;
+    }
+
+    public int getStringCount() {
+        return stringCount;
+    }
+
+    public int getPackageCount() {
+        return packageCount;
+    }
+
+    public int getClassCount() {
+        synchronized (lock) {
+            return classes.size();
+        }
+    }
+
+    public ClassDef findClass(String type) {
+        synchronized (lock) {
+            return classMap.get(type);
+        }
+    }
+
+    public void clear() {
+        synchronized (lock) {
+            dexFiles.clear();
+            classes.clear();
+            classMap.clear();
+        }
+        root = null;
+        fileName = null;
+        fileSize = 0L;
+        dexCount = 0;
+        loadedFile = null;
+        methodCount = 0;
+        fieldCount = 0;
+        stringCount = 0;
+        packageCount = 0;
+        loaded = false;
+    }
+
+    public int load(File file) throws IOException {
+        if (file == null || !file.exists()) {
+            throw new IOException("File does not exist");
+        }
+        fileName = file.getName();
+        fileSize = file.length();
+        loadedFile = file;
+        List<DexBackedDexFile> loadedDex = new ArrayList<>();
+        String name = file.getName().toLowerCase(Locale.ROOT);
+        if (name.endsWith(".dex")) {
+            DexBackedDexFile dex = DexFileFactory.loadDexFile(file, Opcodes.getDefault());
+            loadedDex.add(dex);
+        } else {
+            MultiDexContainer<? extends DexBackedDexFile> container =
+                    DexFileFactory.loadDexContainer(file, Opcodes.getDefault());
+            List<String> entryNames = container.getDexEntryNames();
+            for (String entryName : entryNames) {
+                MultiDexContainer.DexEntry<? extends DexBackedDexFile> entry = container.getEntry(entryName);
+                if (entry != null) {
+                    loadedDex.add(entry.getDexFile());
                 }
             }
-        } catch (Exception ex) {
-            Log.w(TAG, "loadDexContainer failed for " + name + ", trying loadDexFile", ex);
-            if (name.endsWith(".dex")) {
-                DexFile df = DexFileFactory.loadDexFile(file, (Opcodes) null);
-                c = new SingleDexContainer(df, file.getName());
-            } else {
-                throw ex;
+        }
+        if (loadedDex.isEmpty()) {
+            throw new IOException("No DEX data found in " + file.getName());
+        }
+        synchronized (lock) {
+            dexFiles.clear();
+            classes.clear();
+            classMap.clear();
+            dexFiles.addAll(loadedDex);
+            for (DexBackedDexFile dex : loadedDex) {
+                for (ClassDef cls : dex.getClasses()) {
+                    if (classMap.put(cls.getType(), cls) == null) {
+                        classes.add(cls);
+                    }
+                }
             }
         }
-        synchronized (this) {
-            this.loadedFile = file;
-            this.container = c;
-            this.displayName = file.getName();
+        dexCount = loadedDex.size();
+        computeStatistics();
+        root = buildTree();
+        loaded = true;
+        return classes.size();
+    }
+
+    public int loadMultiple(List<File> files) throws IOException {
+        if (files == null || files.isEmpty()) {
+            throw new IOException("No files to load");
         }
+        List<DexBackedDexFile> loadedDex = new ArrayList<>();
+        long totalSize = 0;
+        for (File file : files) {
+            if (file != null && file.exists()) {
+                totalSize += file.length();
+                loadedDex.addAll(loadDexFromFile(file));
+            }
+        }
+        if (loadedDex.isEmpty()) {
+            throw new IOException("No dex data found in selected files");
+        }
+        fileName = files.size() + " files";
+        fileSize = totalSize;
+        dexCount = files.size();
+        loadedFile = files.get(0);
+        synchronized (lock) {
+            dexFiles.clear();
+            classes.clear();
+            classMap.clear();
+            dexFiles.addAll(loadedDex);
+            for (DexBackedDexFile dex : loadedDex) {
+                for (ClassDef cls : dex.getClasses()) {
+                    if (classMap.put(cls.getType(), cls) == null) {
+                        classes.add(cls);
+                    }
+                }
+            }
+        }
+        computeStatistics();
+        root = buildTree();
+        loaded = true;
+        return classes.size();
     }
 
-    public void loadFromUri(Uri uri) throws Exception {
-        Log.i(TAG, "loadFromUri: " + uri);
-        File tmp = copyUriToTemp(uri);
-        Log.i(TAG, "Copied to temp file: " + tmp + " size=" + tmp.length());
-        load(tmp);
+    private List<DexBackedDexFile> loadDexFromFile(File file) throws IOException {
+        List<DexBackedDexFile> result = new ArrayList<>();
+        String name = file.getName().toLowerCase(Locale.ROOT);
+        if (name.endsWith(".dex")) {
+            result.add(DexFileFactory.loadDexFile(file, Opcodes.getDefault()));
+        } else {
+            MultiDexContainer<? extends DexBackedDexFile> container =
+                    DexFileFactory.loadDexContainer(file, Opcodes.getDefault());
+            for (String entryName : container.getDexEntryNames()) {
+                MultiDexContainer.DexEntry<? extends DexBackedDexFile> entry = container.getEntry(entryName);
+                if (entry != null) {
+                    result.add(entry.getDexFile());
+                }
+            }
+        }
+        return result;
     }
 
-    public void loadMultipleUris(List<Uri> uris) throws Exception {
+    public File loadFromUri(Uri uri) throws IOException {
+        if (context == null) {
+            throw new IllegalStateException("DexLoader not initialized with Context");
+        }
+        String displayName = queryDisplayName(uri);
+        String ext = extractExtension(displayName);
+        File cacheFile = copyToCache(uri, ext);
+        load(cacheFile);
+        if (displayName != null) {
+            fileName = displayName;
+        }
+        return cacheFile;
+    }
+
+    public List<File> loadMultipleFromUris(List<Uri> uris) throws IOException {
         if (uris == null || uris.isEmpty()) {
-            throw new IllegalArgumentException("No URIs to load");
+            throw new IOException("No URIs to load");
         }
         if (uris.size() == 1) {
             loadFromUri(uris.get(0));
-            return;
-        }
-        File tmpDir = new File(context.getCacheDir(), "multi_dex_" + System.currentTimeMillis());
-        if (!tmpDir.exists() && !tmpDir.mkdirs()) {
-            throw new IllegalStateException("Cannot create temp dir: " + tmpDir);
+            List<File> one = new ArrayList<>();
+            one.add(loadedFile);
+            return one;
         }
         List<File> files = new ArrayList<>();
-        for (int i = 0; i < uris.size(); i++) {
-            File src = copyUriToTemp(uris.get(i));
-            File renamed = new File(tmpDir, String.format(Locale.US, "merged-%04d.dex", i));
-            if (!src.renameTo(renamed)) {
-                renamed = src;
-            }
-            files.add(renamed);
+        for (Uri u : uris) {
+            files.add(copyToCache(u, "dex"));
         }
-        MultiFileContainer mc = new MultiFileContainer(files);
-        synchronized (this) {
-            this.loadedFile = tmpDir;
-            this.container = mc;
-            this.displayName = files.size() + " DEX files";
-        }
+        loadMultiple(files);
+        return files;
     }
 
-    private File copyUriToTemp(Uri uri) throws Exception {
-        String name = uri.getLastPathSegment();
-        if (name == null || name.isEmpty()) {
-            name = "input.dex";
-        }
-        int slash = name.lastIndexOf('/');
-        if (slash >= 0) name = name.substring(slash + 1);
-        int dot = name.lastIndexOf('.');
-        String suffix = dot >= 0 ? name.substring(dot) : ".dex";
-        String base = dot >= 0 ? name.substring(0, dot) : name;
-        if (base.isEmpty()) {
-            base = "input";
-        }
-        // 清理 base 中的特殊字符，避免 createTempFile 抛异常
-        base = base.replaceAll("[^A-Za-z0-9_-]", "_");
-        File tmp = File.createTempFile(base + "-", suffix, context.getCacheDir());
-        try (InputStream is = context.getContentResolver().openInputStream(uri);
-             OutputStream os = new FileOutputStream(tmp)) {
-            if (is == null) {
-                throw new IllegalStateException("Cannot open input stream for " + uri);
+    private File copyToCache(Uri uri, String ext) throws IOException {
+        String suffix = (ext == null || ext.isEmpty()) ? ".dex" : "." + ext;
+        File outFile = File.createTempFile("loaded_", suffix, context.getCacheDir());
+        try (InputStream in = context.getContentResolver().openInputStream(uri);
+             OutputStream out = new FileOutputStream(outFile)) {
+            if (in == null) {
+                throw new IOException("Cannot open input stream for " + uri);
             }
-            byte[] buf = new byte[8192];
-            int n;
-            long total = 0;
-            while ((n = is.read(buf)) > 0) {
-                os.write(buf, 0, n);
-                total += n;
+            byte[] buffer = new byte[8192];
+            int read;
+            while ((read = in.read(buffer)) != -1) {
+                out.write(buffer, 0, read);
             }
-            Log.i(TAG, "Copy " + uri + " -> " + tmp + " (" + total + " bytes)");
         }
-        return tmp;
+        return outFile;
     }
 
-    public static class SingleDexContainer implements MultiDexContainer<DexFile> {
-        private final DexFile dexFile;
-        private final String entryName;
-
-        public SingleDexContainer(DexFile dexFile, String entryName) {
-            this.dexFile = dexFile;
-            this.entryName = entryName;
-        }
-
-        @Override
-        public List<String> getDexEntryNames() {
-            List<String> list = new ArrayList<>();
-            list.add(entryName);
-            return list;
-        }
-
-        @Override
-        public DexEntry<DexFile> getEntry(String entryName) {
-            if (!this.entryName.equals(entryName)) {
-                return null;
+    private String queryDisplayName(Uri uri) {
+        int idx;
+        String result = null;
+        try (android.database.Cursor cursor = context.getContentResolver().query(uri, null, null, null, null)) {
+            if (cursor != null && cursor.moveToFirst()) {
+                idx = cursor.getColumnIndex("_display_name");
+                if (idx >= 0) {
+                    result = cursor.getString(idx);
+                }
             }
-            return new DexEntry<DexFile>() {
-                @Override
-                public String getEntryName() {
-                    return SingleDexContainer.this.entryName;
-                }
-
-                @Override
-                public DexFile getDexFile() {
-                    return dexFile;
-                }
-
-                @Override
-                public MultiDexContainer<DexFile> getContainer() {
-                    return SingleDexContainer.this;
-                }
-            };
+        } catch (Exception ignored) {
         }
+        if (result == null) {
+            return uri.getLastPathSegment();
+        }
+        return result;
     }
 
-    public static class MultiFileContainer implements MultiDexContainer<DexFile> {
-        private final List<String> entryNames = new ArrayList<>();
-        private final List<DexFile> dexFiles = new ArrayList<>();
+    private static String extractExtension(String name) {
+        int dot;
+        if (name == null || (dot = name.lastIndexOf('.')) < 0 || dot == name.length() - 1) {
+            return null;
+        }
+        return name.substring(dot + 1).toLowerCase(Locale.ROOT);
+    }
 
-        public MultiFileContainer(List<File> files) throws Exception {
-            for (File f : files) {
-                String n = f.getName().toLowerCase(Locale.US);
-                try {
-                    MultiDexContainer<? extends DexFile> c =
-                            DexFileFactory.loadDexContainer(f, (Opcodes) null);
-                    List<String> names = c.getDexEntryNames();
-                    if (names.isEmpty() && n.endsWith(".dex")) {
-                        DexFile df = DexFileFactory.loadDexFile(f, (Opcodes) null);
-                        entryNames.add(f.getName());
-                        dexFiles.add(df);
-                    } else {
-                        for (String nm : names) {
-                            DexEntry<? extends DexFile> e = c.getEntry(nm);
-                            if (e != null) {
-                                entryNames.add(nm);
-                                dexFiles.add(e.getDexFile());
+    private void computeStatistics() {
+        methodCount = 0;
+        fieldCount = 0;
+        Set<String> strings = new HashSet<>();
+        for (ClassDef cls : classes) {
+            for (Method m : cls.getMethods()) {
+                methodCount++;
+                MethodImplementation impl = m.getImplementation();
+                if (impl != null) {
+                    for (Instruction insn : impl.getInstructions()) {
+                        if (insn instanceof ReferenceInstruction) {
+                            Reference ref = ((ReferenceInstruction) insn).getReference();
+                            if (ref instanceof StringReference) {
+                                strings.add(((StringReference) ref).getString());
                             }
                         }
                     }
-                } catch (Exception ex) {
-                    Log.w("MultiFileContainer", "load " + f + " failed", ex);
-                    if (n.endsWith(".dex")) {
-                        DexFile df = DexFileFactory.loadDexFile(f, (Opcodes) null);
-                        entryNames.add(f.getName());
-                        dexFiles.add(df);
+                }
+            }
+            for (Field field : cls.getFields()) {
+                fieldCount++;
+            }
+        }
+        for (DexBackedDexFile dex : dexFiles) {
+            try {
+                for (StringReference sr : dex.getStringReferences()) {
+                    strings.add(sr.getString());
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "Could not read string pool", e);
+            }
+        }
+        stringCount = strings.size();
+        packageCount = countPackages();
+    }
+
+    private int countPackages() {
+        Set<String> packages = new HashSet<>();
+        for (ClassDef cls : classes) {
+            String type = cls.getType();
+            String inner = stripType(type);
+            if (inner != null) {
+                int slash = inner.lastIndexOf('/');
+                if (slash > 0) {
+                    packages.add(inner.substring(0, slash));
+                }
+            }
+        }
+        return packages.size();
+    }
+
+    private ClassNode buildTree() {
+        ClassNode rootNode = new ClassNode(ClassNode.TYPE_PACKAGE, "", null, null);
+        for (ClassDef cls : classes) {
+            String type = cls.getType();
+            String inner = stripType(type);
+            if (inner != null) {
+                String[] parts = inner.split("/");
+                ClassNode current = rootNode;
+                for (int i = 0; i < parts.length; i++) {
+                    if (i == parts.length - 1) {
+                        current.getChildren().add(new ClassNode(ClassNode.TYPE_CLASS, parts[i], type, current));
                     } else {
-                        throw ex;
+                        current = findOrCreatePackage(current, parts[i]);
                     }
                 }
             }
         }
+        sortTree(rootNode);
+        return rootNode;
+    }
 
-        @Override
-        public List<String> getDexEntryNames() {
-            return new ArrayList<>(entryNames);
-        }
-
-        @Override
-        public DexEntry<DexFile> getEntry(String entryName) {
-            int idx = entryNames.indexOf(entryName);
-            if (idx < 0) {
-                return null;
+    private ClassNode findOrCreatePackage(ClassNode parent, String name) {
+        for (ClassNode child : parent.getChildren()) {
+            if (child.isPackage() && child.getName().equals(name)) {
+                return child;
             }
-            final DexFile dexFile = dexFiles.get(idx);
-            final String name = entryNames.get(idx);
-            return new DexEntry<DexFile>() {
-                @Override
-                public String getEntryName() {
-                    return name;
-                }
-
-                @Override
-                public DexFile getDexFile() {
-                    return dexFile;
-                }
-
-                @Override
-                public MultiDexContainer<DexFile> getContainer() {
-                    return MultiFileContainer.this;
-                }
-            };
         }
+        ClassNode pkg = new ClassNode(ClassNode.TYPE_PACKAGE, name, null, parent);
+        parent.getChildren().add(pkg);
+        return pkg;
+    }
+
+    private void sortTree(ClassNode node) {
+        node.getChildren().sort(new Comparator<ClassNode>() {
+            @Override
+            public int compare(ClassNode a, ClassNode b) {
+                if (a.isPackage() != b.isPackage()) {
+                    return a.isPackage() ? -1 : 1;
+                }
+                return a.getName().compareToIgnoreCase(b.getName());
+            }
+        });
+        for (ClassNode child : node.getChildren()) {
+            if (child.isPackage()) {
+                sortTree(child);
+            }
+        }
+    }
+
+    private static String stripType(String type) {
+        if (type == null || type.length() < 2 || type.charAt(0) != 'L') {
+            return null;
+        }
+        int end = type.length() - 1;
+        if (type.charAt(end) != ';') {
+            end = type.length();
+        }
+        return type.substring(1, end);
+    }
+
+    public List<SearchResult> search(int kind, String keyword) {
+        List<SearchResult> results = new ArrayList<>();
+        if (keyword == null || keyword.isEmpty()) {
+            return results;
+        }
+        String needle = keyword.toLowerCase(Locale.ROOT);
+        synchronized (lock) {
+            if (kind == SearchResult.KIND_CLASS) {
+                for (ClassDef cls : classes) {
+                    String readable = toReadableClassName(cls.getType());
+                    if (readable.toLowerCase(Locale.ROOT).contains(needle)
+                            || cls.getType().toLowerCase(Locale.ROOT).contains(needle)) {
+                        results.add(new SearchResult(SearchResult.KIND_CLASS,
+                                readable, cls.getType(), cls.getType()));
+                    }
+                }
+            } else if (kind == SearchResult.KIND_METHOD) {
+                Set<String> seen = new HashSet<>();
+                for (ClassDef cls : classes) {
+                    String owner = toReadableClassName(cls.getType());
+                    for (Method m : cls.getMethods()) {
+                        if (m.getName().toLowerCase(Locale.ROOT).contains(needle)) {
+                            String key = cls.getType() + m.getName() + buildMethodSig(m);
+                            if (seen.add(key)) {
+                                results.add(new SearchResult(SearchResult.KIND_METHOD,
+                                        m.getName(), owner + "\n" + buildMethodSig(m), cls.getType()));
+                            }
+                        }
+                    }
+                }
+            } else if (kind == SearchResult.KIND_STRING) {
+                Set<String> seen = new HashSet<>();
+                for (ClassDef cls : classes) {
+                    String owner = toReadableClassName(cls.getType());
+                    for (Method m : cls.getMethods()) {
+                        MethodImplementation impl = m.getImplementation();
+                        if (impl == null) continue;
+                        for (Instruction insn : impl.getInstructions()) {
+                            if (insn instanceof ReferenceInstruction) {
+                                Reference ref = ((ReferenceInstruction) insn).getReference();
+                                if (ref instanceof StringReference) {
+                                    String s = ((StringReference) ref).getString();
+                                    if (s.toLowerCase(Locale.ROOT).contains(needle)) {
+                                        String key = cls.getType() + s;
+                                        if (seen.add(key)) {
+                                            String display = s.length() > 200 ? s.substring(0, 200) + "…" : s;
+                                            results.add(new SearchResult(SearchResult.KIND_STRING,
+                                                    display, owner, cls.getType()));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return results;
+    }
+
+    private static String buildMethodSig(Method m) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(m.getName()).append("(");
+        List<? extends MethodParameter> params = m.getParameters();
+        for (int i = 0; i < params.size(); i++) {
+            if (i > 0) sb.append(", ");
+            sb.append(params.get(i).getType());
+        }
+        sb.append(") : ").append(m.getReturnType());
+        return sb.toString();
+    }
+
+    public static String toReadableClassName(String type) {
+        if (type == null) return "";
+        String inner = stripType(type);
+        if (inner == null) return type;
+        return inner.replace('/', '.').replace('$', '.');
     }
 }

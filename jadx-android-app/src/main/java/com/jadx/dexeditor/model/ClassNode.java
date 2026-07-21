@@ -1,26 +1,39 @@
 package com.jadx.dexeditor.model;
 
-import com.android.tools.smali.dexlib2.iface.ClassDef;
-
 import java.util.ArrayList;
 import java.util.List;
 
 public class ClassNode {
-    private ClassDef classDef;
-    private List<ClassNode> children = new ArrayList<>();
-    private ClassNode parent;
-    private String label;
+    public static final int TYPE_PACKAGE = 0;
+    public static final int TYPE_CLASS = 1;
 
-    public ClassNode(ClassDef classDef) {
-        this.classDef = classDef;
+    private final int type;
+    private final String name;
+    private final String classType;
+    private final ClassNode parent;
+    private final List<ClassNode> children = new ArrayList<>();
+    private int depth;
+    private boolean expanded;
+
+    public ClassNode(int type, String name, String classType, ClassNode parent) {
+        this.type = type;
+        this.name = name;
+        this.classType = classType;
+        this.parent = parent;
+        this.depth = parent == null ? 0 : parent.depth + 1;
+        this.expanded = parent == null;
     }
 
-    public ClassNode(String label) {
-        this.label = label;
+    public int getType() {
+        return type;
     }
 
-    public ClassDef getClassDef() {
-        return classDef;
+    public String getName() {
+        return name;
+    }
+
+    public String getClassType() {
+        return classType;
     }
 
     public List<ClassNode> getChildren() {
@@ -31,58 +44,38 @@ public class ClassNode {
         return parent;
     }
 
-    public void setParent(ClassNode parent) {
-        this.parent = parent;
+    public boolean isExpanded() {
+        return expanded;
     }
 
-    public String getLabel() {
-        return label;
+    public void setExpanded(boolean expanded) {
+        this.expanded = expanded;
     }
 
-    public void setLabel(String label) {
-        this.label = label;
+    public int getDepth() {
+        return depth;
     }
 
-    public String getType() {
-        if (classDef != null) {
-            return classDef.getType();
+    public void setDepth(int depth) {
+        this.depth = depth;
+    }
+
+    public boolean isPackage() {
+        return type == TYPE_PACKAGE;
+    }
+
+    public boolean isClass() {
+        return type == TYPE_CLASS;
+    }
+
+    public int countClasses() {
+        if (type == TYPE_CLASS) {
+            return 1;
         }
-        return null;
-    }
-
-    public String getSimpleName() {
-        if (classDef != null) {
-            String type = classDef.getType();
-            if (type == null) {
-                return "";
-            }
-            return simpleNameFromDescriptor(type);
+        int count = 0;
+        for (ClassNode child : children) {
+            count += child.countClasses();
         }
-        return label;
-    }
-
-    private static String simpleNameFromDescriptor(String descriptor) {
-        String s = descriptor;
-        if (s.startsWith("L") && s.endsWith(";") && s.length() >= 2) {
-            s = s.substring(1, s.length() - 1);
-        }
-        int idx = s.lastIndexOf('/');
-        if (idx >= 0) {
-            s = s.substring(idx + 1);
-        }
-        int dollar = s.lastIndexOf('$');
-        if (dollar >= 0) {
-            s = s.substring(dollar + 1);
-        }
-        return s;
-    }
-
-    public void addChild(ClassNode child) {
-        child.setParent(this);
-        children.add(child);
-    }
-
-    public boolean isLeaf() {
-        return children.isEmpty();
+        return count;
     }
 }

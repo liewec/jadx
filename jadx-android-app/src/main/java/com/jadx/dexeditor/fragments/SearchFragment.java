@@ -1,16 +1,17 @@
 package com.jadx.dexeditor.fragments;
 
 import android.os.Bundle;
-import android.text.Editable;
-import android.text.TextWatcher;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.inputmethod.EditorInfo;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.RadioGroup;
+import android.widget.ProgressBar;
+import android.widget.Spinner;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -19,171 +20,129 @@ import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.android.tools.smali.dexlib2.iface.ClassDef;
-import com.android.tools.smali.dexlib2.iface.DexFile;
-import com.android.tools.smali.dexlib2.iface.MultiDexContainer;
-import com.android.tools.smali.dexlib2.iface.reference.StringReference;
 import com.jadx.dexeditor.DexLoader;
 import com.jadx.dexeditor.MainActivity;
 import com.jadx.dexeditor.R;
-import com.jadx.dexeditor.SmaliUtils;
 import com.jadx.dexeditor.adapter.SearchResultAdapter;
 import com.jadx.dexeditor.model.SearchResult;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
-public class SearchFragment extends Fragment {
-    private RadioGroup modeGroup;
-    private EditText input;
-    private Button btnSearch;
-    private TextView resultCount;
-    private TextView emptyView;
-    private RecyclerView resultListView;
+public class SearchFragment extends Fragment implements SearchResultAdapter.OnResultClickListener {
+    private static final int MAX_RESULTS = 500;
+
     private SearchResultAdapter adapter;
-    /** 防止 clearResults() 调用 input.setText("") 时触发 afterTextChanged 递归 */
-    private boolean clearing = false;
+    private TextView emptyText;
+    private EditText keywordEdit;
+    private ProgressBar progressBar;
+    private TextView resultCountText;
+    private Button searchButton;
+    private Spinner typeSpinner;
+
+    private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        adapter = new SearchResultAdapter(this);
+    }
 
     @Nullable
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        View v = inflater.inflate(R.layout.fragment_search, container, false);
-        modeGroup = v.findViewById(R.id.search_mode_group);
-        input = v.findViewById(R.id.search_input);
-        btnSearch = v.findViewById(R.id.btn_search);
-        resultCount = v.findViewById(R.id.result_count);
-        emptyView = v.findViewById(R.id.empty_view);
-        resultListView = v.findViewById(R.id.result_list);
-        resultListView.setLayoutManager(new LinearLayoutManager(getContext()));
-        adapter = new SearchResultAdapter(this::onResultClick);
-        resultListView.setAdapter(adapter);
-        btnSearch.setOnClickListener(vw -> doSearch());
-        input.setOnEditorActionListener((tv, actionId, event) -> {
-            if (actionId == EditorInfo.IME_ACTION_SEARCH || (event != null && event.getKeyCode() == KeyEvent.KEYCODE_ENTER)) {
+    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
+                             @Nullable Bundle savedInstanceState) {
+        View view = inflater.inflate(R.layout.fragment_search, container, false);
+        typeSpinner = view.findViewById(R.id.search_type_spinner);
+        keywordEdit = view.findViewById(R.id.keyword_edit);
+        searchButton = view.findViewById(R.id.search_button);
+        resultCountText = view.findViewById(R.id.result_count_text);
+        emptyText = view.findViewById(R.id.empty_text);
+        progressBar = view.findViewById(R.id.loading_progress);
+
+        ArrayAdapter<String> spinnerAdapter = new ArrayAdapter<>(requireContext(),
+                android.R.layout.simple_spinner_item,
+                new String[]{
+                        getString(R.string.search_type_class),
+                        getString(R.string.search_type_method),
+                        getString(R.string.search_type_string)
+                });
+        spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        typeSpinner.setAdapter(spinnerAdapter);
+
+        RecyclerView recycler = view.findViewById(R.id.result_recycler);
+        recycler.setLayoutManager(new LinearLayoutManager(getContext()));
+        recycler.setAdapter(adapter);
+
+        searchButton.setOnClickListener(v -> doSearch());
+        keywordEdit.setOnEditorActionListener((v, actionId, event) -> {
+            if (event != null && event.getKeyCode() == KeyEvent.KEYCODE_ENTER) {
                 doSearch();
                 return true;
             }
             return false;
         });
-        input.addTextChangedListener(new TextWatcher() {
-            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
-            @Override public void afterTextChanged(Editable s) {
-                // 防止 clearResults() 内部 setText("") 触发自身递归（曾导致 StackOverflowError）
-                if (clearing) return;
-                if (s.length() == 0) clearResults();
-            }
-        });
-        return v;
-    }
-
-    public void clearResults() {
-        if (clearing) return;
-        clearing = true;
-        try {
-            if (adapter != null) adapter.clear();
-            if (resultCount != null) { resultCount.setVisibility(View.GONE); resultCount.setText(""); }
-            if (emptyView != null) emptyView.setVisibility(View.GONE);
-            if (input != null && input.getText() != null && input.getText().length() > 0) {
-                input.setText("");
-            }
-        } finally {
-            clearing = false;
-        }
-    }
-
-    private void onResultClick(SearchResult r) {
-        if (getActivity() instanceof MainActivity.Host) ((MainActivity.Host) getActivity()).openClass(r.getClassType());
-    }
-
-    private int currentMode() {
-        int checked = modeGroup.getCheckedRadioButtonId();
-        if (checked == R.id.radio_method) return SearchResult.MODE_METHOD;
-        if (checked == R.id.radio_string) return SearchResult.MODE_STRING;
-        return SearchResult.MODE_CLASS;
+        return view;
     }
 
     private void doSearch() {
-        DexLoader loader = getLoader();
-        if (loader == null || !loader.isLoaded()) { showEmpty(getString(R.string.no_file_loaded)); return; }
-        String keyword = input.getText() == null ? "" : input.getText().toString().trim();
-        if (keyword.isEmpty()) return;
-        int mode = currentMode();
-        List<SearchResult> results = new ArrayList<>();
-        MultiDexContainer<? extends DexFile> container = loader.getContainer();
-        try {
-            String lower = keyword.toLowerCase(Locale.US);
-            for (String entryName : container.getDexEntryNames()) {
-                MultiDexContainer.DexEntry<? extends DexFile> entry = container.getEntry(entryName);
-                if (entry == null) continue;
-                DexFile dex = entry.getDexFile();
-                for (ClassDef cd : dex.getClasses()) {
-                    String type = cd.getType();
-                    String javaName = SmaliUtils.descriptorToJavaName(type);
-                    if (mode == SearchResult.MODE_CLASS) {
-                        if (javaName.toLowerCase(Locale.US).contains(lower))
-                            results.add(new SearchResult(mode, SmaliUtils.simpleName(type), javaName, type));
-                    } else if (mode == SearchResult.MODE_METHOD) {
-                        AtomicInteger hitCount = new AtomicInteger(0);
-                        for (com.android.tools.smali.dexlib2.iface.Method m : cd.getMethods()) {
-                            if (m.getName().toLowerCase(Locale.US).contains(lower)) hitCount.incrementAndGet();
-                        }
-                        if (hitCount.get() > 0)
-                            results.add(new SearchResult(mode, SmaliUtils.simpleName(type), hitCount + " method(s)", type));
-                    } else {
-                        for (com.android.tools.smali.dexlib2.iface.Method m : cd.getMethods())
-                            searchStringsInMethod(m, lower, type, results, mode);
-                    }
-                }
+        if (!DexLoader.getInstance().isLoaded()) {
+            return;
+        }
+        final String keyword = keywordEdit.getText().toString().trim();
+        if (keyword.isEmpty()) {
+            adapter.setItems(null);
+            resultCountText.setVisibility(View.GONE);
+            emptyText.setVisibility(View.GONE);
+            return;
+        }
+        final int searchKind = typeSpinner.getSelectedItemPosition();
+        progressBar.setVisibility(View.VISIBLE);
+        executor.execute(() -> {
+            List<SearchResult> results = DexLoader.getInstance().search(searchKind, keyword);
+            if (results.size() > MAX_RESULTS) {
+                results = results.subList(0, MAX_RESULTS);
             }
-        } catch (Throwable e) { showEmpty("search error: " + e.getMessage()); return; }
-        renderResults(results);
+            final List<SearchResult> sub = results;
+            mainHandler.post(() -> {
+                if (!isAdded()) return;
+                progressBar.setVisibility(View.GONE);
+                adapter.setItems(sub);
+                int count = sub.size();
+                resultCountText.setVisibility(View.VISIBLE);
+                resultCountText.setText(getString(R.string.search_results_count, count));
+                emptyText.setVisibility(count == 0 ? View.VISIBLE : View.GONE);
+            });
+        });
     }
 
-    private void searchStringsInMethod(com.android.tools.smali.dexlib2.iface.Method m, String lowerKeyword, String classType, List<SearchResult> results, int mode) {
-        try {
-            com.android.tools.smali.dexlib2.iface.MethodImplementation impl = m.getImplementation();
-            if (impl == null) return;
-            for (com.android.tools.smali.dexlib2.iface.instruction.Instruction inst : impl.getInstructions()) {
-                if (inst instanceof com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction) {
-                    Object ref = ((com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction) inst).getReference();
-                    if (ref instanceof StringReference) {
-                        String s = ((StringReference) ref).getString();
-                        if (s != null && s.toLowerCase(Locale.US).contains(lowerKeyword)) {
-                            String snippet = s.length() > 60 ? s.substring(0, 60) + "…" : s;
-                            results.add(new SearchResult(mode, snippet, SmaliUtils.simpleName(classType) + "." + m.getName(), classType));
-                            return;
-                        }
-                    }
-                }
-            }
-        } catch (Throwable ignored) {}
-    }
-
-    private void renderResults(List<SearchResult> results) {
-        adapter.setData(results);
-        if (results.isEmpty()) {
-            resultCount.setVisibility(View.GONE);
-            emptyView.setVisibility(View.VISIBLE);
-            emptyView.setText(R.string.search_no_result);
-        } else {
-            emptyView.setVisibility(View.GONE);
-            resultCount.setVisibility(View.VISIBLE);
-            resultCount.setText(getString(R.string.search_result_count, results.size()));
+    @Override
+    public void onResultClicked(SearchResult result) {
+        if (getActivity() instanceof MainActivity) {
+            ((MainActivity) getActivity()).openClass(result.getClassType());
         }
     }
 
-    private void showEmpty(String msg) {
-        adapter.clear();
-        resultCount.setVisibility(View.GONE);
-        emptyView.setVisibility(View.VISIBLE);
-        emptyView.setText(msg);
+    public void clearResults() {
+        if (adapter != null) {
+            adapter.setItems(null);
+        }
+        if (resultCountText != null) {
+            resultCountText.setVisibility(View.GONE);
+        }
+        if (emptyText != null) {
+            emptyText.setVisibility(View.GONE);
+        }
+        if (keywordEdit != null) {
+            keywordEdit.setText("");
+        }
     }
 
-    private DexLoader getLoader() {
-        if (getActivity() instanceof MainActivity.Host) return ((MainActivity.Host) getActivity()).getDexLoader();
-        return null;
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        executor.shutdownNow();
     }
 }

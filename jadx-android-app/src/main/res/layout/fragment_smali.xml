@@ -10,40 +10,53 @@
         android:orientation="horizontal"
         android:padding="4dp">
 
-        <Button
-            android:id="@+id/btn_back"
+        <ToggleButton
+            android:id="@+id/toggle_java"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/back" />
-
-        <TextView
-            android:id="@+id/smali_title"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center_vertical"
-            android:layout_marginStart="8dp"
-            android:layout_weight="1"
-            android:textColor="?android:attr/textColorPrimary"
-            android:textSize="16sp"
-            android:textStyle="bold" />
+            android:textOff="Smali"
+            android:textOn="Java" />
 
         <Button
-            android:id="@+id/btn_save_smali"
+            android:id="@+id/compile_button"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/save" />
+            android:text="@string/compile_button" />
+
+        <Button
+            android:id="@+id/copy_button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/copy_button" />
 
     </LinearLayout>
+
+    <TextView
+        android:id="@+id/status_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="4dp"
+        android:textColor="?android:attr/textColorSecondary"
+        android:textSize="12sp" />
+
+    <ProgressBar
+        android:id="@+id/loading_progress"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone" />
 
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
-        <TextView
-            android:id="@+id/smali_code"
+        <EditText
+            android:id="@+id/smali_edit"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:background="@null"
             android:fontFamily="monospace"
+            android:gravity="top"
+            android:inputType="textMultiLine|textNoSuggestions"
             android:padding="8dp"
             android:textIsSelectable="true"
             android:textSize="12sp" />

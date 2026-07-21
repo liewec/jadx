@@ -6,24 +6,44 @@
     <string name="title_info">信息</string>
     <string name="action_open_file">打开文件</string>
     <string name="action_open_folder">打开文件夹</string>
-    <string name="action_reload">重新加载</string>
     <string name="loading">正在加载…</string>
-    <string name="load_failed">加载失败：%1$s</string>
-    <string name="no_file_loaded">未加载文件</string>
+    <string name="load_error_prefix">加载失败：</string>
+    <string name="no_file_selected">未选择文件</string>
     <string name="no_dex_in_folder">文件夹中没有 .dex 文件</string>
-    <string name="no_classes">没有类</string>
-    <string name="search_no_result">无搜索结果</string>
-    <string name="search_result_count">找到 %1$d 个结果</string>
-    <string name="back">返回</string>
-    <string name="save">保存</string>
+    <string name="open_failed">打开失败</string>
     <string name="prompt_open_file">请从工具栏打开 .dex 或 .apk 文件</string>
-    <string name="info_file_name">文件名：%1$s</string>
-    <string name="info_dex_count">DEX 数量：%1$d</string>
-    <string name="info_class_count">类总数：%1$d</string>
-    <string name="info_method_count">方法总数：%1$d</string>
-    <string name="info_field_count">字段总数：%1$d</string>
-    <string name="label_method">方法名</string>
-    <string name="label_string">字符串</string>
-    <string name="btn_search">搜索</string>
+    <string name="loaded_count">已加载 %1$d 个类</string>
+    <string name="loaded_multiple">已加载 %1$d 个文件，共 %2$d 个类</string>
+
+    <string name="default_package">默认包</string>
+    <string name="copy_name">复制类名</string>
+    <string name="copied_to_clipboard">已复制到剪贴板</string>
+
+    <string name="info_no_data">未加载文件</string>
+    <string name="info_file_name">文件名</string>
+    <string name="info_file_size">文件大小</string>
+    <string name="info_dex_count">DEX 数量</string>
+    <string name="info_class_count">类总数</string>
+    <string name="info_method_count">方法总数</string>
+    <string name="info_field_count">字段总数</string>
+    <string name="info_string_count">字符串总数</string>
+    <string name="info_package_count">包总数</string>
+
+    <string name="search_type_class">类</string>
+    <string name="search_type_method">方法</string>
+    <string name="search_type_string">字符串</string>
+    <string name="search_no_result">无搜索结果</string>
+    <string name="search_results_count">找到 %1$d 个结果</string>
     <string name="hint_search">输入关键字</string>
+    <string name="btn_search">搜索</string>
+
+    <string name="smali_loading">正在反汇编…</string>
+    <string name="decompiling">正在反编译…</string>
+    <string name="compiling">正在编译…</string>
+    <string name="disasm_failed">反汇编失败</string>
+    <string name="compile_button">编译</string>
+    <string name="compile_success">编译成功</string>
+    <string name="compile_failed">编译失败</string>
+    <string name="copy_button">复制</string>
+    <string name="copy_success">已复制</string>
 </resources>
