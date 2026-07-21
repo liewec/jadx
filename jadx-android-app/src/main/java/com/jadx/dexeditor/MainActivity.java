@@ -215,34 +215,55 @@ public class MainActivity extends AppCompatActivity {
         new Thread(() -> {
             String error = null;
             String fullTrace = null;
-            try { task.run(); }
-            catch (Throwable e) {
-                Throwable root = e;
-                while (root.getCause() != null && root.getCause() != root) root = root.getCause();
-                error = root.getMessage();
-                if (error == null) error = root.getClass().getName();
-                if (error == null) error = e.toString();
-                StringBuilder sb = new StringBuilder();
-                sb.append("Root cause: ").append(root.getClass().getName())
-                        .append(": ").append(root.getMessage()).append("\n\n");
-                sb.append("Full stack trace:\n");
-                java.io.StringWriter sw = new java.io.StringWriter();
-                e.printStackTrace(new java.io.PrintWriter(sw));
-                sb.append(sw.toString());
-                fullTrace = sb.toString();
+            try {
+                task.run();
+            } catch (Throwable e) {
+                fullTrace = formatError(e);
+                error = extractSummary(e);
+                DexEditorApp.setLastError(fullTrace);
                 android.util.Log.e("DexEditor", "loadFileAsync failed", e);
             }
             final String finalError = error;
             final String finalTrace = fullTrace;
             runOnUiThread(() -> {
-                if (pd.isShowing()) pd.dismiss();
+                try {
+                    if (pd.isShowing()) pd.dismiss();
+                } catch (Throwable ignored) {}
                 if (finalError != null) {
                     showErrorDialog(finalError, finalTrace);
                     return;
                 }
-                onLoaded();
+                try {
+                    onLoaded();
+                } catch (Throwable t) {
+                    String trace = formatError(t);
+                    DexEditorApp.setLastError("onLoaded crashed:\n" + trace);
+                    showErrorDialog(extractSummary(t), trace);
+                }
             });
         }).start();
+    }
+
+    private static String formatError(Throwable e) {
+        StringBuilder sb = new StringBuilder();
+        Throwable root = e;
+        while (root.getCause() != null && root.getCause() != root) root = root.getCause();
+        sb.append("Root cause: ").append(root.getClass().getName())
+                .append(": ").append(root.getMessage()).append("\n\n");
+        sb.append("Full stack trace:\n");
+        java.io.StringWriter sw = new java.io.StringWriter();
+        e.printStackTrace(new java.io.PrintWriter(sw));
+        sb.append(sw.toString());
+        return sb.toString();
+    }
+
+    private static String extractSummary(Throwable e) {
+        Throwable root = e;
+        while (root.getCause() != null && root.getCause() != root) root = root.getCause();
+        String msg = root.getMessage();
+        if (msg == null) msg = root.getClass().getName();
+        if (msg == null) msg = e.toString();
+        return msg;
     }
 
     /** 在手机上直接显示错误对话框，不用 adb 也能看到完整堆栈 */

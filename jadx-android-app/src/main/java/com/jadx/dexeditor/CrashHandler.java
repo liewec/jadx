@@ -34,6 +34,14 @@ public class CrashHandler implements Thread.UncaughtExceptionHandler {
     @Override
     public void uncaughtException(Thread t, Throwable e) {
         try {
+            // 同步保存到 DexEditorApp.lastError，让 Info Tab 能看到
+            StringWriter sw = new StringWriter();
+            PrintWriter pw = new PrintWriter(sw);
+            pw.println("Crash on thread: " + t);
+            pw.println("Time: " + new Date());
+            pw.println();
+            e.printStackTrace(pw);
+            DexEditorApp.setLastError(sw.toString());
             writeCrashLog(t, e);
         } catch (Throwable ignored) {
             Log.e(TAG, "Failed to write crash log", e);
