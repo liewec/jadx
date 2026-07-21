@@ -1,0 +1,9 @@
+-keep class com.android.tools.smali.** { *; }
+-keep class jadx.** { *; }
+-keep class com.jadx.dexeditor.** { *; }
+-keep class org.slf4j.** { *; }
+-keep class com.google.gson.** { *; }
+-keep class com.google.common.** { *; }
+-dontwarn javax.annotation.**
+-dontwarn org.jetbrains.annotations.**
+-dontwarn com.google.errorprone.annotations.**
