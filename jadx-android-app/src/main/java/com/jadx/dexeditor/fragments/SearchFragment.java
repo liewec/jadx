@@ -43,6 +43,8 @@ public class SearchFragment extends Fragment {
     private TextView emptyView;
     private RecyclerView resultListView;
     private SearchResultAdapter adapter;
+    /** 防止 clearResults() 调用 input.setText("") 时触发 afterTextChanged 递归 */
+    private boolean clearing = false;
 
     @Nullable
     @Override
@@ -69,6 +71,8 @@ public class SearchFragment extends Fragment {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
             @Override public void afterTextChanged(Editable s) {
+                // 防止 clearResults() 内部 setText("") 触发自身递归（曾导致 StackOverflowError）
+                if (clearing) return;
                 if (s.length() == 0) clearResults();
             }
         });
@@ -76,10 +80,18 @@ public class SearchFragment extends Fragment {
     }
 
     public void clearResults() {
-        if (adapter != null) adapter.clear();
-        if (resultCount != null) { resultCount.setVisibility(View.GONE); resultCount.setText(""); }
-        if (emptyView != null) emptyView.setVisibility(View.GONE);
-        if (input != null) input.setText("");
+        if (clearing) return;
+        clearing = true;
+        try {
+            if (adapter != null) adapter.clear();
+            if (resultCount != null) { resultCount.setVisibility(View.GONE); resultCount.setText(""); }
+            if (emptyView != null) emptyView.setVisibility(View.GONE);
+            if (input != null && input.getText() != null && input.getText().length() > 0) {
+                input.setText("");
+            }
+        } finally {
+            clearing = false;
+        }
     }
 
     private void onResultClick(SearchResult r) {
