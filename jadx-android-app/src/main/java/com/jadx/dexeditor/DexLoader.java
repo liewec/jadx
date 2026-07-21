@@ -2,6 +2,7 @@ package com.jadx.dexeditor;
 
 import android.content.Context;
 import android.net.Uri;
+import android.util.Log;
 
 import com.android.tools.smali.dexlib2.DexFileFactory;
 import com.android.tools.smali.dexlib2.Opcodes;
@@ -17,6 +18,7 @@ import java.util.List;
 import java.util.Locale;
 
 public class DexLoader {
+    private static final String TAG = "DexLoader";
     private final Context context;
     private File loadedFile;
     private MultiDexContainer<? extends DexFile> container;
@@ -43,7 +45,32 @@ public class DexLoader {
     }
 
     public void load(File file) throws Exception {
-        MultiDexContainer<? extends DexFile> c = DexFileFactory.loadDexContainer(file, (Opcodes) null);
+        Log.i(TAG, "Loading file: " + file + " size=" + file.length());
+        String name = file.getName().toLowerCase(Locale.US);
+        MultiDexContainer<? extends DexFile> c;
+        try {
+            c = DexFileFactory.loadDexContainer(file, (Opcodes) null);
+            List<String> entries = c.getDexEntryNames();
+            Log.i(TAG, "loadDexContainer OK, entries=" + entries);
+            if (entries.isEmpty()) {
+                throw new IllegalStateException("File contains no DEX entries: " + file.getName());
+            }
+            // 修正 entry 名：单 .dex 文件被加载时 entry 名是绝对路径，改为简单文件名
+            if (entries.size() == 1 && name.endsWith(".dex")) {
+                MultiDexContainer.DexEntry<? extends DexFile> e = c.getEntry(entries.get(0));
+                if (e != null) {
+                    c = new SingleDexContainer(e.getDexFile(), file.getName());
+                }
+            }
+        } catch (Exception ex) {
+            Log.w(TAG, "loadDexContainer failed for " + name + ", trying loadDexFile", ex);
+            if (name.endsWith(".dex")) {
+                DexFile df = DexFileFactory.loadDexFile(file, (Opcodes) null);
+                c = new SingleDexContainer(df, file.getName());
+            } else {
+                throw ex;
+            }
+        }
         synchronized (this) {
             this.loadedFile = file;
             this.container = c;
@@ -52,7 +79,9 @@ public class DexLoader {
     }
 
     public void loadFromUri(Uri uri) throws Exception {
+        Log.i(TAG, "loadFromUri: " + uri);
         File tmp = copyUriToTemp(uri);
+        Log.i(TAG, "Copied to temp file: " + tmp + " size=" + tmp.length());
         load(tmp);
     }
 
@@ -69,23 +98,19 @@ public class DexLoader {
             throw new IllegalStateException("Cannot create temp dir: " + tmpDir);
         }
         List<File> files = new ArrayList<>();
-        try {
-            for (int i = 0; i < uris.size(); i++) {
-                File src = copyUriToTemp(uris.get(i));
-                File renamed = new File(tmpDir, String.format(Locale.US, "merged-%04d.dex", i));
-                if (!src.renameTo(renamed)) {
-                    renamed = src;
-                }
-                files.add(renamed);
+        for (int i = 0; i < uris.size(); i++) {
+            File src = copyUriToTemp(uris.get(i));
+            File renamed = new File(tmpDir, String.format(Locale.US, "merged-%04d.dex", i));
+            if (!src.renameTo(renamed)) {
+                renamed = src;
             }
-            MultiFileContainer mc = new MultiFileContainer(files);
-            synchronized (this) {
-                this.loadedFile = tmpDir;
-                this.container = mc;
-                this.displayName = files.size() + " DEX files";
-            }
-        } catch (Exception e) {
-            throw e;
+            files.add(renamed);
+        }
+        MultiFileContainer mc = new MultiFileContainer(files);
+        synchronized (this) {
+            this.loadedFile = tmpDir;
+            this.container = mc;
+            this.displayName = files.size() + " DEX files";
         }
     }
 
@@ -94,12 +119,16 @@ public class DexLoader {
         if (name == null || name.isEmpty()) {
             name = "input.dex";
         }
+        int slash = name.lastIndexOf('/');
+        if (slash >= 0) name = name.substring(slash + 1);
         int dot = name.lastIndexOf('.');
         String suffix = dot >= 0 ? name.substring(dot) : ".dex";
         String base = dot >= 0 ? name.substring(0, dot) : name;
         if (base.isEmpty()) {
             base = "input";
         }
+        // 清理 base 中的特殊字符，避免 createTempFile 抛异常
+        base = base.replaceAll("[^A-Za-z0-9_-]", "_");
         File tmp = File.createTempFile(base + "-", suffix, context.getCacheDir());
         try (InputStream is = context.getContentResolver().openInputStream(uri);
              OutputStream os = new FileOutputStream(tmp)) {
@@ -108,9 +137,12 @@ public class DexLoader {
             }
             byte[] buf = new byte[8192];
             int n;
+            long total = 0;
             while ((n = is.read(buf)) > 0) {
                 os.write(buf, 0, n);
+                total += n;
             }
+            Log.i(TAG, "Copy " + uri + " -> " + tmp + " (" + total + " bytes)");
         }
         return tmp;
     }
@@ -161,20 +193,32 @@ public class DexLoader {
 
         public MultiFileContainer(List<File> files) throws Exception {
             for (File f : files) {
-                MultiDexContainer<? extends DexFile> c =
-                        DexFileFactory.loadDexContainer(f, (Opcodes) null);
-                List<String> names = c.getDexEntryNames();
-                if (names.isEmpty()) {
-                    String n = f.getName();
-                    entryNames.add(n);
-                    dexFiles.add(null);
-                } else {
-                    for (String nm : names) {
-                        DexEntry<? extends DexFile> e = c.getEntry(nm);
-                        if (e != null) {
-                            entryNames.add(nm);
-                            dexFiles.add(e.getDexFile());
+                String n = f.getName().toLowerCase(Locale.US);
+                try {
+                    MultiDexContainer<? extends DexFile> c =
+                            DexFileFactory.loadDexContainer(f, (Opcodes) null);
+                    List<String> names = c.getDexEntryNames();
+                    if (names.isEmpty() && n.endsWith(".dex")) {
+                        DexFile df = DexFileFactory.loadDexFile(f, (Opcodes) null);
+                        entryNames.add(f.getName());
+                        dexFiles.add(df);
+                    } else {
+                        for (String nm : names) {
+                            DexEntry<? extends DexFile> e = c.getEntry(nm);
+                            if (e != null) {
+                                entryNames.add(nm);
+                                dexFiles.add(e.getDexFile());
+                            }
                         }
+                    }
+                } catch (Exception ex) {
+                    Log.w("MultiFileContainer", "load " + f + " failed", ex);
+                    if (n.endsWith(".dex")) {
+                        DexFile df = DexFileFactory.loadDexFile(f, (Opcodes) null);
+                        entryNames.add(f.getName());
+                        dexFiles.add(df);
+                    } else {
+                        throw ex;
                     }
                 }
             }

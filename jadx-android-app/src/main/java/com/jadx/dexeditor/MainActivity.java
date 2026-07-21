@@ -84,6 +84,16 @@ public class MainActivity extends AppCompatActivity {
             infoFragment = (InfoFragment) fm.findFragmentByTag("info");
             activeMainFragment = findVisibleMainFragment();
         }
+        // 处理通过 VIEW intent 打开的文件
+        if (savedInstanceState == null) {
+            Intent intent = getIntent();
+            if (intent != null) {
+                Uri data = intent.getData();
+                if (data != null) {
+                    loadFromUri(data);
+                }
+            }
+        }
     }
 
     private Fragment findVisibleMainFragment() {
@@ -204,8 +214,12 @@ public class MainActivity extends AppCompatActivity {
             String error = null;
             try { task.run(); }
             catch (Throwable e) {
-                error = e.getCause() != null ? e.getCause().getMessage() : e.getMessage();
+                Throwable root = e;
+                while (root.getCause() != null && root.getCause() != root) root = root.getCause();
+                error = root.getMessage();
+                if (error == null) error = root.getClass().getName();
                 if (error == null) error = e.toString();
+                android.util.Log.e("DexEditor", "loadFileAsync failed", e);
             }
             final String finalError = error;
             runOnUiThread(() -> {
