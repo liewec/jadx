@@ -70,11 +70,27 @@ public class BrowseFragment extends Fragment {
     }
 
     public void refresh() {
+        // 每次刷新都重新获取 host，避免持有旧 Activity 引用导致 dexLoader 状态不一致
+        MainActivity.Host h = null;
+        if (getActivity() instanceof MainActivity.Host) {
+            h = (MainActivity.Host) getActivity();
+            host = h;
+        } else if (host == null) {
+            showEmpty(getString(R.string.no_file_loaded));
+            return;
+        } else {
+            h = host;
+        }
+        android.util.Log.i("BrowseFragment", "refresh called, classListView="
+                + (classListView != null) + " host=" + (h != null));
         if (classListView == null) {
             return;
         }
-        DexLoader loader = host == null ? null : host.getDexLoader();
-        if (loader == null || !loader.isLoaded()) {
+        DexLoader loader = h.getDexLoader();
+        boolean loaded = loader != null && loader.isLoaded();
+        android.util.Log.i("BrowseFragment", "loader=" + (loader != null)
+                + " isLoaded=" + loaded);
+        if (!loaded) {
             showEmpty(getString(R.string.no_file_loaded));
             return;
         }
@@ -87,6 +103,7 @@ public class BrowseFragment extends Fragment {
         showEmpty("加载中…");
         final DexLoader finalLoader = loader;
         treeWorker = new Thread(() -> {
+            android.util.Log.i("BrowseFragment", "treeWorker started");
             final List<ClassNode> roots;
             final String[] errorMsg = new String[1];
             try {
@@ -95,14 +112,23 @@ public class BrowseFragment extends Fragment {
                 android.util.Log.e("BrowseFragment", "buildTree failed", t);
                 errorMsg[0] = "构建类树失败: " + t.getClass().getSimpleName()
                         + ": " + t.getMessage();
+                if (getActivity() == null) return;
+                final String m = errorMsg[0];
+                getActivity().runOnUiThread(() -> showEmpty(m));
                 return;
-            } finally {
-                if (Thread.currentThread().isInterrupted()) return;
             }
-            if (getActivity() == null) return;
+            if (Thread.currentThread().isInterrupted()) {
+                android.util.Log.i("BrowseFragment", "treeWorker interrupted");
+                return;
+            }
+            if (getActivity() == null) {
+                android.util.Log.i("BrowseFragment", "activity null after build");
+                return;
+            }
+            android.util.Log.i("BrowseFragment",
+                    "treeWorker done, roots=" + (roots == null ? 0 : roots.size()));
             final String msg = errorMsg[0];
             getActivity().runOnUiThread(() -> {
-                if (Thread.currentThread().isInterrupted()) return;
                 if (msg != null) {
                     showEmpty(msg);
                     return;
@@ -114,6 +140,8 @@ public class BrowseFragment extends Fragment {
                 if (emptyView != null) emptyView.setVisibility(View.GONE);
                 classListView.setVisibility(View.VISIBLE);
                 adapter.setData(roots);
+                android.util.Log.i("BrowseFragment", "adapter.setData done, items="
+                        + adapter.getItemCount());
             });
         });
         treeWorker.setDaemon(true);

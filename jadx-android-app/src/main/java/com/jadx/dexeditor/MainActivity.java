@@ -236,22 +236,15 @@ public class MainActivity extends AppCompatActivity {
                     showErrorDialog(finalError, finalTrace);
                     return;
                 }
-                // 把 onLoaded 推到下一帧，避免 ProgressDialog dismiss 与刷新同时进行造成卡顿
-                classListView_post(() -> {
-                    try {
-                        onLoaded();
-                    } catch (Throwable t) {
-                        String trace = formatError(t);
-                        DexEditorApp.setLastError("onLoaded crashed:\n" + trace);
-                        showErrorDialog(extractSummary(t), trace);
-                    }
-                });
+                try {
+                    onLoaded();
+                } catch (Throwable t) {
+                    String trace = formatError(t);
+                    DexEditorApp.setLastError("onLoaded crashed:\n" + trace);
+                    showErrorDialog(extractSummary(t), trace);
+                }
             });
         }).start();
-    }
-
-    private void classListView_post(Runnable r) {
-        getWindow().getDecorView().post(r);
     }
 
     private static String formatError(Throwable e) {
@@ -329,10 +322,24 @@ public class MainActivity extends AppCompatActivity {
         if (searchFragment != null) searchFragment.clearResults();
         // 加载完成后无论当前 Tab 是哪个，都强制刷新 browse 和 info，
         // 否则当 activeMainFragment 不是 BrowseFragment 时类列表不会刷新。
+        android.util.Log.i("MainActivity", "onLoaded: browseFragment="
+                + (browseFragment != null) + " infoFragment=" + (infoFragment != null)
+                + " isLoaded=" + dexLoader.isLoaded()
+                + " container=" + (dexLoader.getContainer() != null));
         if (browseFragment != null) browseFragment.refresh();
         if (infoFragment != null) infoFragment.refresh();
         toolbar.setSubtitle(dexLoader.getDisplayName());
-        Toast.makeText(this, "Loaded: " + dexLoader.getDisplayName(), Toast.LENGTH_SHORT).show();
+        // 诊断 Toast：让用户在手机上也能看到加载状态
+        int entries = 0;
+        if (dexLoader.getContainer() != null) {
+            try {
+                entries = dexLoader.getContainer().getDexEntryNames().size();
+            } catch (Throwable ignored) {}
+        }
+        Toast.makeText(this,
+                "Loaded: " + dexLoader.getDisplayName()
+                        + " (entries=" + entries + ")",
+                Toast.LENGTH_LONG).show();
     }
 
     public DexLoader getDexLoader() { return dexLoader; }
