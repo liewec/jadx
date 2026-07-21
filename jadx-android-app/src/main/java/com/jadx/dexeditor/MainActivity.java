@@ -301,13 +301,23 @@ public class MainActivity extends AppCompatActivity {
                 .setTitle(getString(R.string.load_failed, ""))
                 .setMessage(summary)
                 .setView(scroll)
-                .setPositiveButton("复制", (d, w) -> {
-                    android.content.ClipboardManager cm =
-                            (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-                    if (cm != null) {
-                        cm.setPrimaryClip(android.content.ClipData.newPlainText("error", copyText));
-                        Toast.makeText(this, "完整错误信息已复制到剪贴板", Toast.LENGTH_SHORT).show();
-                    }
+                .setPositiveButton("保存到文件", (d, w) -> {
+                    // 在子线程写文件，避免大文本 IO 阻塞 UI
+                    final String textToSave = copyText;
+                    new Thread(() -> {
+                        final File saved = DexEditorApp.saveErrorLogToFile(textToSave);
+                        runOnUiThread(() -> {
+                            if (saved != null) {
+                                Toast.makeText(this,
+                                        "已保存：" + saved.getAbsolutePath(),
+                                        Toast.LENGTH_LONG).show();
+                            } else {
+                                Toast.makeText(this,
+                                        "保存失败（无法写入存储）",
+                                        Toast.LENGTH_SHORT).show();
+                            }
+                        });
+                    }).start();
                 })
                 .setNegativeButton("关闭", null)
                 .setCancelable(true)

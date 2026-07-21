@@ -1,8 +1,5 @@
 package com.jadx.dexeditor.fragments;
 
-import android.content.ClipData;
-import android.content.ClipboardManager;
-import android.content.Context;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -25,6 +22,8 @@ import com.jadx.dexeditor.DexLoader;
 import com.jadx.dexeditor.MainActivity;
 import com.jadx.dexeditor.R;
 import com.jadx.dexeditor.SmaliUtils;
+
+import java.io.File;
 
 public class InfoFragment extends Fragment {
     /** 对话框内显示的最大字符数，超过则截断（避免大文本布局/渲染卡死） */
@@ -90,13 +89,23 @@ public class InfoFragment extends Fragment {
         new AlertDialog.Builder(requireContext())
                 .setTitle("最近错误日志")
                 .setView(scroll)
-                .setPositiveButton("复制", (d, w) -> {
-                    ClipboardManager cm = (ClipboardManager) requireContext()
-                            .getSystemService(Context.CLIPBOARD_SERVICE);
-                    if (cm != null) {
-                        cm.setPrimaryClip(ClipData.newPlainText("error", copyText));
-                        Toast.makeText(getContext(), "完整日志已复制到剪贴板", Toast.LENGTH_SHORT).show();
-                    }
+                .setPositiveButton("保存到文件", (d, w) -> {
+                    final String textToSave = copyText;
+                    new Thread(() -> {
+                        final File saved = DexEditorApp.saveErrorLogToFile(textToSave);
+                        if (getActivity() == null) return;
+                        getActivity().runOnUiThread(() -> {
+                            if (saved != null) {
+                                Toast.makeText(getContext(),
+                                        "已保存：" + saved.getAbsolutePath(),
+                                        Toast.LENGTH_LONG).show();
+                            } else {
+                                Toast.makeText(getContext(),
+                                        "保存失败（无法写入存储）",
+                                        Toast.LENGTH_SHORT).show();
+                            }
+                        });
+                    }).start();
                 })
                 .setNegativeButton("关闭", null)
                 .show();
