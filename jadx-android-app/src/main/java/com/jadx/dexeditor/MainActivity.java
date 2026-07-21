@@ -327,12 +327,10 @@ public class MainActivity extends AppCompatActivity {
     private void onLoaded() {
         SmaliUtils.clearCache();
         if (searchFragment != null) searchFragment.clearResults();
-        if (activeMainFragment instanceof BrowseFragment) ((BrowseFragment) activeMainFragment).refresh();
-        else if (activeMainFragment instanceof InfoFragment) ((InfoFragment) activeMainFragment).refresh();
-        else {
-            if (browseFragment != null) browseFragment.refresh();
-            if (infoFragment != null) infoFragment.refresh();
-        }
+        // 加载完成后无论当前 Tab 是哪个，都强制刷新 browse 和 info，
+        // 否则当 activeMainFragment 不是 BrowseFragment 时类列表不会刷新。
+        if (browseFragment != null) browseFragment.refresh();
+        if (infoFragment != null) infoFragment.refresh();
         toolbar.setSubtitle(dexLoader.getDisplayName());
         Toast.makeText(this, "Loaded: " + dexLoader.getDisplayName(), Toast.LENGTH_SHORT).show();
     }

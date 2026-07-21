@@ -87,10 +87,26 @@ public class BrowseFragment extends Fragment {
         showEmpty("加载中…");
         final DexLoader finalLoader = loader;
         treeWorker = new Thread(() -> {
-            List<ClassNode> roots = buildTree(finalLoader);
-            if (Thread.interrupted()) return;
+            final List<ClassNode> roots;
+            final String[] errorMsg = new String[1];
+            try {
+                roots = buildTree(finalLoader);
+            } catch (Throwable t) {
+                android.util.Log.e("BrowseFragment", "buildTree failed", t);
+                errorMsg[0] = "构建类树失败: " + t.getClass().getSimpleName()
+                        + ": " + t.getMessage();
+                return;
+            } finally {
+                if (Thread.currentThread().isInterrupted()) return;
+            }
             if (getActivity() == null) return;
+            final String msg = errorMsg[0];
             getActivity().runOnUiThread(() -> {
+                if (Thread.currentThread().isInterrupted()) return;
+                if (msg != null) {
+                    showEmpty(msg);
+                    return;
+                }
                 if (roots == null || roots.isEmpty()) {
                     showEmpty("No classes found");
                     return;
@@ -114,41 +130,44 @@ public class BrowseFragment extends Fragment {
         }
     }
 
-    private List<ClassNode> buildTree(DexLoader loader) {
+    private List<ClassNode> buildTree(DexLoader loader) throws Throwable {
         ClassNode root = new ClassNode("Classes");
         Map<String, ClassNode> packageNodes = new HashMap<>();
         MultiDexContainer<? extends DexFile> container = loader.getContainer();
         if (container == null) {
             return new ArrayList<>();
         }
-        try {
-            for (String entryName : container.getDexEntryNames()) {
-                MultiDexContainer.DexEntry<? extends DexFile> entry = container.getEntry(entryName);
-                if (entry == null) {
-                    continue;
-                }
-                DexFile dex = entry.getDexFile();
-                for (ClassDef cd : dex.getClasses()) {
-                    String type = cd.getType();
-                    String javaName = SmaliUtils.descriptorToJavaName(type);
-                    int lastDot = javaName.lastIndexOf('.');
-                    ClassNode pkgNode;
-                    if (lastDot > 0) {
-                        String pkgPath = javaName.substring(0, lastDot);
-                        pkgNode = packageNodes.get(pkgPath);
-                        if (pkgNode == null) {
-                            pkgNode = ensurePackageNode(root, pkgPath, packageNodes);
-                        }
-                    } else {
-                        pkgNode = root;
-                    }
-                    ClassNode classNode = new ClassNode(cd);
-                    pkgNode.addChild(classNode);
-                }
+        int entryCount = 0;
+        int classCount = 0;
+        for (String entryName : container.getDexEntryNames()) {
+            MultiDexContainer.DexEntry<? extends DexFile> entry = container.getEntry(entryName);
+            if (entry == null) {
+                continue;
             }
-        } catch (Throwable e) {
-            return new ArrayList<>();
+            entryCount++;
+            DexFile dex = entry.getDexFile();
+            for (ClassDef cd : dex.getClasses()) {
+                String type = cd.getType();
+                String javaName = SmaliUtils.descriptorToJavaName(type);
+                int lastDot = javaName.lastIndexOf('.');
+                ClassNode pkgNode;
+                if (lastDot > 0) {
+                    String pkgPath = javaName.substring(0, lastDot);
+                    pkgNode = packageNodes.get(pkgPath);
+                    if (pkgNode == null) {
+                        pkgNode = ensurePackageNode(root, pkgPath, packageNodes);
+                    }
+                } else {
+                    pkgNode = root;
+                }
+                ClassNode classNode = new ClassNode(cd);
+                pkgNode.addChild(classNode);
+                classCount++;
+            }
         }
+        android.util.Log.i("BrowseFragment",
+                "buildTree done: entries=" + entryCount + " classes=" + classCount
+                        + " rootChildren=" + root.getChildren().size());
         return root.getChildren();
     }
 
