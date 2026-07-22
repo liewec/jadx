@@ -2,6 +2,11 @@ plugins {
     id("com.android.application") version "8.5.0"
 }
 
+repositories {
+    mavenCentral()
+    google()
+}
+
 android {
     namespace = "com.jadx.dexeditor"
     compileSdk = 34
@@ -61,7 +66,13 @@ configurations.all {
 }
 
 dependencies {
-    implementation(fileTree("/opt/jadx-libs") { include("*.jar") })
+    implementation("io.github.skylot:jadx-core:1.5.6")
+    implementation("com.android.tools.smali:smali:3.0.9") {
+        exclude(group = "com.beust", module = "jcommander")
+    }
+    implementation("com.android.tools.smali:smali-baksmali:3.0.9") {
+        exclude(group = "com.beust", module = "jcommander")
+    }
 
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("androidx.activity:activity-ktx:1.9.0")

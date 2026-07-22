@@ -1,19 +1,23 @@
 package com.jadx.dexeditor;
 
 import android.content.ContentResolver;
+import android.content.DialogInterface;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.DocumentsContract;
+import android.text.method.LinkMovementMethod;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.fragment.app.Fragment;
@@ -61,6 +65,7 @@ public class MainActivity extends AppCompatActivity {
         toolbar = findViewById(R.id.toolbar);
         bottomNav = findViewById(R.id.bottom_nav);
         setSupportActionBar(toolbar);
+        toolbar.setSubtitle(R.string.toolbar_subtitle);
 
         getSupportFragmentManager().addOnBackStackChangedListener(this::updateBottomNavVisibility);
         updateBottomNavVisibility();
@@ -140,7 +145,24 @@ public class MainActivity extends AppCompatActivity {
             openFolderLauncher.launch(null);
             return true;
         }
+        if (id == R.id.action_about) {
+            showAboutDialog();
+            return true;
+        }
         return super.onOptionsItemSelected(item);
+    }
+
+    private void showAboutDialog() {
+        TextView message = new TextView(this);
+        message.setText(R.string.about_content);
+        message.setMovementMethod(LinkMovementMethod.getInstance());
+        message.setPadding(64, 48, 64, 0);
+        message.setTextSize(14);
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.about_title)
+                .setView(message)
+                .setPositiveButton(android.R.string.ok, (DialogInterface.OnClickListener) (d, w) -> d.dismiss())
+                .show();
     }
 
     private void loadFromUri(final Uri uri) {
