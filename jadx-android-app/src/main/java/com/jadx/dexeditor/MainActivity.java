@@ -48,9 +48,16 @@ public class MainActivity extends AppCompatActivity {
     private Thread loadThread;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
-    private final ActivityResultLauncher<String> openFileLauncher =
-            registerForActivityResult(new ActivityResultContracts.GetContent(), uri -> {
-                if (uri != null) loadFromUri(uri);
+    private final ActivityResultLauncher<String[]> openFileLauncher =
+            registerForActivityResult(new ActivityResultContracts.OpenDocument(), uri -> {
+                if (uri != null) {
+                    try {
+                        getContentResolver().takePersistableUriPermission(uri,
+                                android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    } catch (SecurityException ignored) {
+                    }
+                    loadFromUri(uri);
+                }
             });
 
     private final ActivityResultLauncher<Uri> openFolderLauncher =
@@ -139,7 +146,7 @@ public class MainActivity extends AppCompatActivity {
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         int id = item.getItemId();
         if (id == R.id.action_open_file) {
-            openFileLauncher.launch("*/*");
+            openFileLauncher.launch(new String[]{"*/*"});
             return true;
         }
         if (id == R.id.action_open_folder) {
