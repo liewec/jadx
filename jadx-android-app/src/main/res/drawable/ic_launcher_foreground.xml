@@ -4,14 +4,14 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- 左侧 < 实心三角形 -->
+    <!-- 左侧 > 实心三角形（指向右） -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M26,38 L12,54 L26,70 Z" />
-    <!-- 右侧 > 实心三角形 -->
+        android:pathData="M12,38 L26,54 L12,70 Z" />
+    <!-- 右侧 < 实心三角形（指向左） -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M82,38 L96,54 L82,70 Z" />
+        android:pathData="M96,38 L82,54 L96,70 Z" />
     <!-- DEX 三字母（瘦小，居中，细描边） -->
     <!-- D：竖线 + 半圆弧 -->
     <path
