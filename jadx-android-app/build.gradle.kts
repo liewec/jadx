@@ -67,6 +67,9 @@ configurations.all {
 
 dependencies {
     implementation("io.github.skylot:jadx-core:1.5.6")
+    implementation("io.github.skylot:jadx-dex-input:1.5.6")
+    implementation("io.github.skylot:jadx-java-convert:1.5.6")
+    implementation("io.github.skylot:jadx-smali-input:1.5.6")
     implementation("com.android.tools.smali:smali:3.0.9") {
         exclude(group = "com.beust", module = "jcommander")
     }

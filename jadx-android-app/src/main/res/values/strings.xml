@@ -47,30 +47,8 @@
     <string name="copy_button">复制</string>
     <string name="copy_success">已复制</string>
 
-    <string name="toolbar_subtitle">by.吾爱破解52pojie.cn</string>
+    <string name="toolbar_subtitle">by.吾爱破解52pojie.cn 空满水杯</string>
     <string name="action_about">关于</string>
     <string name="about_title">关于 Dex 编辑器</string>
-    <string name="about_content"><![CDATA[
-Dex 编辑器 v1.0
-
-一款基于 jadx 与 smali 3.0.9 的 Android DEX/APK 编辑器。
-
-主要功能：
-• 浏览 DEX/APK 中的类结构（按包层级展示）
-• 查看类的 Smali 反汇编代码
-• 一键反编译为 Java 源码
-• 在线编辑并重新编译 Smali 代码
-• 按类名 / 方法名 / 字符串快速搜索
-• 查看文件统计信息（类、方法、字段、字符串数量）
-
-技术栈：
-• 反汇编/编译：smali 3.0.9 (JesusFreke/smali)
-• Java 反编译：jadx (skylot/jadx)
-• UI：AndroidX + Material Components
-
-致谢：
-感谢吾爱破解 (52pojie.cn) 社区的支持。
-
-作者：by.吾爱破解52pojie.cn
-    ]]></string>
+    <string name="about_content">Dex 编辑器 v1.0\n\n一款基于 jadx 与 smali 3.0.9 的 Android DEX/APK 编辑器。\n\n主要功能：\n• 浏览 DEX/APK 中的类结构（按包层级展示）\n• 查看类的 Smali 反汇编代码\n• 一键反编译为 Java 源码\n• 在线编辑并重新编译 Smali 代码\n• 按类名 / 方法名 / 字符串快速搜索\n• 查看文件统计信息（类、方法、字段、字符串数量）\n\n技术栈：\n• 反汇编/编译：smali 3.0.9 (JesusFreke/smali)\n• Java 反编译：jadx (skylot/jadx)\n• UI：AndroidX + Material Components\n\n致谢：\n感谢吾爱破解 (52pojie.cn) 社区的支持。\n\n作者：空满水杯</string>
 </resources>

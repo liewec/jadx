@@ -40,9 +40,10 @@ public final class SmaliUtils {
         }
         String fullName = classType;
         if (fullName.startsWith("L") && fullName.endsWith(";")) {
-            fullName = fullName.substring(1, fullName.length() - 1).replace('/', '.').replace('$', '.');
+            fullName = fullName.substring(1, fullName.length() - 1).replace('/', '.');
         }
         final String target = fullName;
+        final String targetNormalized = fullName.replace('$', '.');
         JadxArgs args = new JadxArgs();
         args.setSkipResources(true);
         args.setShowInconsistentCode(true);
@@ -50,24 +51,38 @@ public final class SmaliUtils {
         args.addInputFile(dexFile);
         try (JadxDecompiler jadx = new JadxDecompiler(args)) {
             jadx.load();
-            for (JavaClass cls : jadx.getClassesWithInners()) {
+            // 先在顶层类中查找
+            for (JavaClass cls : jadx.getClasses()) {
                 String name = cls.getFullName();
                 if (name != null) {
-                    String normalized = name.replace('$', '.');
-                    if (normalized.equals(target)) {
+                    if (name.equals(target) || name.replace('$', '.').equals(targetNormalized)) {
                         cls.decompile();
                         String code = cls.getCode();
-                        if (code == null || code.isEmpty()) {
-                            return "// 无法反编译此类";
+                        if (code != null && !code.isEmpty()) {
+                            return code;
                         }
-                        return code;
                     }
                 }
             }
-            return "// 无法反编译此类";
+            // 再在内部类中查找
+            for (JavaClass cls : jadx.getClasses()) {
+                for (JavaClass inner : cls.getInnerClasses()) {
+                    String name = inner.getFullName();
+                    if (name != null) {
+                        if (name.equals(target) || name.replace('$', '.').equals(targetNormalized)) {
+                            inner.decompile();
+                            String code = inner.getCode();
+                            if (code != null && !code.isEmpty()) {
+                                return code;
+                            }
+                        }
+                    }
+                }
+            }
+            return "// 无法反编译此类\n// 未在 DEX 中找到类：" + target;
         } catch (Throwable e) {
             Log.w(TAG, "jadx decompilation failed for " + classType, e);
-            return "// 无法反编译此类：" + e.getMessage();
+            return "// 反编译失败：" + e.getClass().getSimpleName() + ": " + e.getMessage();
         }
     }
 

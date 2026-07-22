@@ -66,6 +66,7 @@ public class MainActivity extends AppCompatActivity {
         bottomNav = findViewById(R.id.bottom_nav);
         setSupportActionBar(toolbar);
         toolbar.setSubtitle(R.string.toolbar_subtitle);
+        toolbar.setSubtitleTextAppearance(this, R.style.ToolbarSubtitleAppearance);
 
         getSupportFragmentManager().addOnBackStackChangedListener(this::updateBottomNavVisibility);
         updateBottomNavVisibility();

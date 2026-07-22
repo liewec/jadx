@@ -15,4 +15,7 @@
     </style>
     <style name="Theme.DexEditor.AppBarOverlay" parent="ThemeOverlay.AppCompat.Dark.ActionBar" />
     <style name="Theme.DexEditor.PopupOverlay" parent="ThemeOverlay.AppCompat.Light" />
+    <style name="ToolbarSubtitleAppearance" parent="TextAppearance.AppCompat.Caption">
+        <item name="android:textSize">10sp</item>
+    </style>
 </resources>
