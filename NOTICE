@@ -211,3 +211,51 @@ Icons copied from several places:
  - Eclipse Project (JDT UI) - licensed under EPL v1.0 (http://www.eclipse.org/legal/epl-v10.html)
  - famfamfam silk icon set (http://www.famfamfam.com/lab/icons/silk/) - licensed
      under Creative Commons Attribution 2.5 License (http://creativecommons.org/licenses/by/2.5/)
+
+
+Dex Editor (Android app) referenced components
+==============================================
+
+Apktool (https://github.com/iBotPeaches/Apktool) released under Apache License 2.0.
+The AndroidManifest.xml (AXML) binary <-> text conversion, resource ID to name
+resolution and XML formatting logic in com.jadx.dexeditor.axml are inspired by
+Apktool's AXML/ARSC decoder implementation.
+
+*******************************************************************************
+Copyright (C) 2010 Ryszard Wiśniewski
+Copyright (C) 2010-2024 Connor Tumbleson
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*******************************************************************************
+
+
+BlackDex (https://github.com/codinggay/blackdex) released under Apache License 2.0.
+The obfuscated APK (packed APK) detection and static unpacking logic in
+com.jadx.dexeditor.apk.Unpacker is inspired by BlackDex's unpacking approach.
+Default output path download/dex52pj follows BlackDex's storage convention.
+
+*******************************************************************************
+Copyright (C) 2021 BlackDex
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*******************************************************************************

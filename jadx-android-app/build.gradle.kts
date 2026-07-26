@@ -15,8 +15,8 @@ android {
         applicationId = "com.jadx.dexeditor"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
     }
 
     buildTypes {
@@ -76,11 +76,14 @@ dependencies {
     implementation("com.android.tools.smali:smali-baksmali:3.0.9") {
         exclude(group = "com.beust", module = "jcommander")
     }
+    // APK 签名 (v1/v2/v3)
+    implementation("com.android.tools.build:apksig:8.5.0")
 
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("androidx.activity:activity-ktx:1.9.0")
     implementation("androidx.fragment:fragment-ktx:1.7.1")
     implementation("androidx.recyclerview:recyclerview:1.3.2")
+    implementation("androidx.preference:preference:1.2.1")
     implementation("com.google.android.material:material:1.12.0")
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
 }

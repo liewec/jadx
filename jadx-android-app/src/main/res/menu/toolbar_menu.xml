@@ -12,6 +12,14 @@
         android:title="@string/action_open_folder"
         app:showAsAction="ifRoom|withText" />
     <item
+        android:id="@+id/action_info"
+        android:title="@string/title_info"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_settings"
+        android:title="@string/title_settings"
+        app:showAsAction="never" />
+    <item
         android:id="@+id/action_about"
         android:title="@string/action_about"
         app:showAsAction="never" />

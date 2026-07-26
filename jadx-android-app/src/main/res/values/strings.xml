@@ -4,6 +4,10 @@
     <string name="title_browse">浏览</string>
     <string name="title_search">搜索</string>
     <string name="title_info">信息</string>
+    <string name="title_manifest">Manifest</string>
+    <string name="title_resource">资源</string>
+    <string name="title_unshell">脱壳</string>
+    <string name="title_settings">设置</string>
     <string name="action_open_file">打开文件</string>
     <string name="action_open_folder">打开文件夹</string>
     <string name="loading">正在加载…</string>
@@ -50,5 +54,47 @@
     <string name="toolbar_subtitle">by.吾爱破解52pojie.cn 空满水杯</string>
     <string name="action_about">关于</string>
     <string name="about_title">关于 Dex 编辑器</string>
-    <string name="about_content">Dex 编辑器 v1.0\n\n一款基于 jadx 与 smali 3.0.9 的 Android DEX/APK 编辑器。\n\n主要功能：\n• 浏览 DEX/APK 中的类结构（按包层级展示）\n• 查看类的 Smali 反汇编代码\n• 一键反编译为 Java 源码\n• 在线编辑并重新编译 Smali 代码\n• 按类名 / 方法名 / 字符串快速搜索\n• 查看文件统计信息（类、方法、字段、字符串数量）\n\n技术栈：\n• 反汇编/编译：smali 3.0.9 (JesusFreke/smali)\n• Java 反编译：jadx (skylot/jadx)\n• UI：AndroidX + Material Components\n\n致谢：\n感谢吾爱破解 (52pojie.cn) 社区的支持。\n\n作者：空满水杯</string>
+    <string name="about_content">Dex 编辑器 v1.1\n\n一款基于 jadx 与 smali 3.0.9 的 Android DEX/APK 编辑器，支持 AndroidManifest 编辑、APK 资源替换与重签名、壳检测与静态脱壳。\n\n主要功能：\n• 浏览 DEX/APK 中的类结构（按包层级展示）\n• 查看类的 Smali 反汇编代码\n• 一键反编译为 Java 源码\n• 在线编辑并重新编译 Smali 代码\n• 按类名 / 方法名 / 字符串快速搜索\n• 查看 DEX 文件统计信息\n• 编辑 AndroidManifest.xml（二进制 AXML ↔ 文本 XML，资源 ID 自动转名称，语法高亮 + 自动补全）\n• 替换 APK 资源（图标、布局、字符串）\n• 重新打包并使用内置密钥签名 APK（v1 + v2 + v3）\n• 壳检测（360加固 / 腾讯乐固 / 爱加密 / 梆梆 / 百度 / 阿里 等）与静态脱壳\n• 自定义缓存 / 脱壳 / 成品 / 密钥库路径\n\n技术栈：\n• 反汇编/编译：smali 3.0.9 (JesusFreke/smali, Apache-2.0)\n• Java 反编译：jadx (skylot/jadx, Apache-2.0)\n• APK 签名：apksig (Google, Apache-2.0)\n• AXML / ARSC 解析：自实现，参考 AOSP ResourceTypes.h\n• 脱壳思路参考：blackdex (codinggay/blackdex, Apache-2.0)\n• UI：AndroidX + Material Components\n\n开源致谢：\n• https://github.com/iBotPeaches/Apktool  (Apache License 2.0)\n• https://github.com/codinggay/blackdex  (Apache License 2.0)\n• https://github.com/JesusFreke/smali  (Apache License 2.0)\n• https://github.com/skylot/jadx  (Apache License 2.0)\n\n致谢：\n感谢吾爱破解 (52pojie.cn) 社区的支持。\n\n作者：空满水杯</string>
+
+    <!-- Manifest / Resource / Unshell / Settings -->
+    <string name="btn_open_apk">打开 APK</string>
+    <string name="btn_decode_manifest">反编译</string>
+    <string name="btn_save_manifest">保存回写</string>
+    <string name="btn_format_xml">格式化</string>
+    <string name="btn_replace_resource">替换资源</string>
+    <string name="btn_pack_sign">打包签名</string>
+    <string name="btn_detect_packer">检测壳</string>
+    <string name="btn_unpack">脱壳</string>
+    <string name="please_open_apk">请先打开 APK</string>
+    <string name="please_select_entry">请先选择要替换的条目</string>
+    <string name="manifest_hint">点击\"打开 APK\"后自动反编译 AndroidManifest.xml</string>
+    <string name="manifest_empty">Manifest 内容为空</string>
+    <string name="manifest_decoded">已反编译 AndroidManifest.xml</string>
+    <string name="manifest_saved_signed">已签名 APK 已保存：\n%1$s</string>
+    <string name="manifest_saved_unsigned">签名失败（%2$s）\n未签名 APK 已保存：\n%1$s</string>
+    <string name="apk_loaded">已加载 APK：%1$s（资源映射 %2$d 项）</string>
+    <string name="apk_loaded_simple">已加载 APK：%1$s</string>
+    <string name="apk_entries">APK：%1$s（共 %2$d 个条目）</string>
+    <string name="entry_selected">已选中：%1$s</string>
+    <string name="entry_replaced">已替换 %1$s，输出 APK：%2$s</string>
+    <string name="replace_success">替换成功</string>
+    <string name="apk_signed">已签名 APK：\n%1$s</string>
+    <string name="sign_success">签名成功</string>
+    <string name="sign_failed">签名失败（%1$s）\n未签名 APK：%2$s</string>
+    <string name="resource_empty">点击\"打开 APK\"查看资源列表</string>
+    <string name="packer_detected">检测到壳：%1$s</string>
+    <string name="no_packer">未检测到壳</string>
+    <string name="unpack_success">脱壳完成，提取 %1$d 个 dex</string>
+    <string name="unpack_failed">脱壳失败</string>
+
+    <!-- Settings -->
+    <string name="pref_cat_paths">路径设置</string>
+    <string name="pref_cat_about">关于</string>
+    <string name="pref_cache_dir_title">缓存目录</string>
+    <string name="pref_unpack_dir_title">脱壳输出目录</string>
+    <string name="pref_output_dir_title">成品输出目录</string>
+    <string name="pref_keystore_dir_title">签名密钥目录</string>
+    <string name="pref_summary_default">默认位于 Download/dex52pj 下</string>
+    <string name="pref_about_title">关于 Dex 编辑器</string>
+    <string name="pref_about_summary">v1.1  by.吾爱破解  空满水杯</string>
 </resources>

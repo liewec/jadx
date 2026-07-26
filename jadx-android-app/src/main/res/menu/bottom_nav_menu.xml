@@ -9,7 +9,15 @@
         android:icon="@drawable/ic_search"
         android:title="@string/title_search" />
     <item
-        android:id="@+id/nav_info"
-        android:icon="@drawable/ic_info"
-        android:title="@string/title_info" />
+        android:id="@+id/nav_manifest"
+        android:icon="@drawable/ic_manifest"
+        android:title="@string/title_manifest" />
+    <item
+        android:id="@+id/nav_resource"
+        android:icon="@drawable/ic_resource"
+        android:title="@string/title_resource" />
+    <item
+        android:id="@+id/nav_unshell"
+        android:icon="@drawable/ic_unshell"
+        android:title="@string/title_unshell" />
 </menu>

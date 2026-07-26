@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <PreferenceCategory android:title="@string/pref_cat_paths">
+        <EditTextPreference
+            android:key="pref_cache_dir"
+            android:title="@string/pref_cache_dir_title"
+            android:dialogTitle="@string/pref_cache_dir_title"
+            android:summary="@string/pref_summary_default" />
+        <EditTextPreference
+            android:key="pref_unpack_dir"
+            android:title="@string/pref_unpack_dir_title"
+            android:dialogTitle="@string/pref_unpack_dir_title"
+            android:summary="@string/pref_summary_default" />
+        <EditTextPreference
+            android:key="pref_output_dir"
+            android:title="@string/pref_output_dir_title"
+            android:dialogTitle="@string/pref_output_dir_title"
+            android:summary="@string/pref_summary_default" />
+        <EditTextPreference
+            android:key="pref_keystore_dir"
+            android:title="@string/pref_keystore_dir_title"
+            android:dialogTitle="@string/pref_keystore_dir_title"
+            android:summary="@string/pref_summary_default" />
+    </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/pref_cat_about">
+        <Preference
+            android:title="@string/pref_about_title"
+            android:summary="@string/pref_about_summary" />
+    </PreferenceCategory>
+
+</PreferenceScreen>

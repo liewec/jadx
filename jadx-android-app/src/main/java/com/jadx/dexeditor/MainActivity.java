@@ -26,8 +26,12 @@ import androidx.fragment.app.FragmentManager;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.jadx.dexeditor.fragments.BrowseFragment;
 import com.jadx.dexeditor.fragments.InfoFragment;
+import com.jadx.dexeditor.fragments.ManifestFragment;
+import com.jadx.dexeditor.fragments.ResourceFragment;
 import com.jadx.dexeditor.fragments.SearchFragment;
+import com.jadx.dexeditor.fragments.SettingsFragment;
 import com.jadx.dexeditor.fragments.SmaliFragment;
+import com.jadx.dexeditor.fragments.UnshellFragment;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -38,12 +42,20 @@ public class MainActivity extends AppCompatActivity {
     private static final String TAG_BROWSE = "browse";
     private static final String TAG_INFO = "info";
     private static final String TAG_SEARCH = "search";
+    private static final String TAG_MANIFEST = "manifest";
+    private static final String TAG_RESOURCE = "resource";
+    private static final String TAG_UNSHELL = "unshell";
+    private static final String TAG_SETTINGS = "settings";
 
     private Toolbar toolbar;
     private BottomNavigationView bottomNav;
     private BrowseFragment browseFragment;
     private SearchFragment searchFragment;
     private InfoFragment infoFragment;
+    private ManifestFragment manifestFragment;
+    private ResourceFragment resourceFragment;
+    private UnshellFragment unshellFragment;
+    private SettingsFragment settingsFragment;
     private Fragment activeFragment;
     private Thread loadThread;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -68,6 +80,9 @@ public class MainActivity extends AppCompatActivity {
         toolbar.setSubtitle(R.string.toolbar_subtitle);
         toolbar.setSubtitleTextAppearance(this, R.style.ToolbarSubtitleAppearance);
 
+        // 初始化路径配置
+        PathConfig.init(getApplicationContext());
+
         getSupportFragmentManager().addOnBackStackChangedListener(this::updateBottomNavVisibility);
         updateBottomNavVisibility();
 
@@ -78,6 +93,10 @@ public class MainActivity extends AppCompatActivity {
             browseFragment = (BrowseFragment) fm.findFragmentByTag(TAG_BROWSE);
             searchFragment = (SearchFragment) fm.findFragmentByTag(TAG_SEARCH);
             infoFragment = (InfoFragment) fm.findFragmentByTag(TAG_INFO);
+            manifestFragment = (ManifestFragment) fm.findFragmentByTag(TAG_MANIFEST);
+            resourceFragment = (ResourceFragment) fm.findFragmentByTag(TAG_RESOURCE);
+            unshellFragment = (UnshellFragment) fm.findFragmentByTag(TAG_UNSHELL);
+            settingsFragment = (SettingsFragment) fm.findFragmentByTag(TAG_SETTINGS);
             activeFragment = findVisibleMainFragment();
         }
 
@@ -85,7 +104,9 @@ public class MainActivity extends AppCompatActivity {
             int id = item.getItemId();
             if (id == R.id.nav_browse) { switchFragment(browseFragment); return true; }
             if (id == R.id.nav_search) { switchFragment(searchFragment); return true; }
-            if (id == R.id.nav_info) { switchFragment(infoFragment); return true; }
+            if (id == R.id.nav_manifest) { switchFragment(manifestFragment); return true; }
+            if (id == R.id.nav_resource) { switchFragment(resourceFragment); return true; }
+            if (id == R.id.nav_unshell) { switchFragment(unshellFragment); return true; }
             return false;
         });
 
@@ -102,15 +123,24 @@ public class MainActivity extends AppCompatActivity {
         browseFragment = new BrowseFragment();
         searchFragment = new SearchFragment();
         infoFragment = new InfoFragment();
+        manifestFragment = new ManifestFragment();
+        resourceFragment = new ResourceFragment();
+        unshellFragment = new UnshellFragment();
+        settingsFragment = new SettingsFragment();
         getSupportFragmentManager().beginTransaction()
                 .add(R.id.fragment_container, browseFragment, TAG_BROWSE)
                 .add(R.id.fragment_container, searchFragment, TAG_SEARCH).hide(searchFragment)
+                .add(R.id.fragment_container, manifestFragment, TAG_MANIFEST).hide(manifestFragment)
+                .add(R.id.fragment_container, resourceFragment, TAG_RESOURCE).hide(resourceFragment)
+                .add(R.id.fragment_container, unshellFragment, TAG_UNSHELL).hide(unshellFragment)
                 .add(R.id.fragment_container, infoFragment, TAG_INFO).hide(infoFragment)
+                .add(R.id.fragment_container, settingsFragment, TAG_SETTINGS).hide(settingsFragment)
                 .commitNow();
         activeFragment = browseFragment;
     }
 
     private void switchFragment(Fragment target) {
+        if (target == null) return;
         if (target == activeFragment) return;
         getSupportFragmentManager().beginTransaction()
                 .hide(activeFragment)
@@ -125,7 +155,11 @@ public class MainActivity extends AppCompatActivity {
     private Fragment findVisibleMainFragment() {
         if (browseFragment != null && browseFragment.isVisible()) return browseFragment;
         if (searchFragment != null && searchFragment.isVisible()) return searchFragment;
+        if (manifestFragment != null && manifestFragment.isVisible()) return manifestFragment;
+        if (resourceFragment != null && resourceFragment.isVisible()) return resourceFragment;
+        if (unshellFragment != null && unshellFragment.isVisible()) return unshellFragment;
         if (infoFragment != null && infoFragment.isVisible()) return infoFragment;
+        if (settingsFragment != null && settingsFragment.isVisible()) return settingsFragment;
         return browseFragment != null ? browseFragment : infoFragment;
     }
 
@@ -144,6 +178,14 @@ public class MainActivity extends AppCompatActivity {
         }
         if (id == R.id.action_open_folder) {
             openFolderLauncher.launch(null);
+            return true;
+        }
+        if (id == R.id.action_info) {
+            switchFragment(infoFragment);
+            return true;
+        }
+        if (id == R.id.action_settings) {
+            switchFragment(settingsFragment);
             return true;
         }
         if (id == R.id.action_about) {
