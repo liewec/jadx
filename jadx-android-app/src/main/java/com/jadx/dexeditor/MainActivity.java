@@ -172,14 +172,6 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem item) {
         int id = item.getItemId();
-        if (id == R.id.action_open_file) {
-            openFileLauncher.launch("*/*");
-            return true;
-        }
-        if (id == R.id.action_open_folder) {
-            openFolderLauncher.launch(null);
-            return true;
-        }
         if (id == R.id.action_info) {
             switchFragment(infoFragment);
             return true;
@@ -193,6 +185,16 @@ public class MainActivity extends AppCompatActivity {
             return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    /** 由 BrowseFragment 的“打开文件”按钮调用 */
+    public void openFile() {
+        openFileLauncher.launch("*/*");
+    }
+
+    /** 由 BrowseFragment 的“打开文件夹”按钮调用 */
+    public void openFolder() {
+        openFolderLauncher.launch(null);
     }
 
     private void showAboutDialog() {

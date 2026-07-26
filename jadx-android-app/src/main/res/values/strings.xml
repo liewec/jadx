@@ -15,7 +15,7 @@
     <string name="no_file_selected">未选择文件</string>
     <string name="no_dex_in_folder">文件夹中没有 .dex 文件</string>
     <string name="open_failed">打开失败</string>
-    <string name="prompt_open_file">请从工具栏打开 .dex 或 .apk 文件</string>
+    <string name="prompt_open_file">点击\"打开文件\"或\"打开文件夹\"加载 .dex 或 .apk 文件</string>
     <string name="loaded_count">已加载 %1$d 个类</string>
     <string name="loaded_multiple">已加载 %1$d 个文件，共 %2$d 个类</string>
 

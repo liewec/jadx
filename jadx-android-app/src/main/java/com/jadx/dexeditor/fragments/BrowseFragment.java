@@ -9,6 +9,7 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -44,6 +45,18 @@ public class BrowseFragment extends Fragment implements ClassTreeAdapter.OnNodeC
         RecyclerView recycler = view.findViewById(R.id.tree_recycler);
         recycler.setLayoutManager(new LinearLayoutManager(getContext()));
         recycler.setAdapter(adapter);
+        Button btnOpenFile = view.findViewById(R.id.btn_open_file);
+        Button btnOpenFolder = view.findViewById(R.id.btn_open_folder);
+        btnOpenFile.setOnClickListener(v -> {
+            if (getActivity() instanceof MainActivity) {
+                ((MainActivity) getActivity()).openFile();
+            }
+        });
+        btnOpenFolder.setOnClickListener(v -> {
+            if (getActivity() instanceof MainActivity) {
+                ((MainActivity) getActivity()).openFolder();
+            }
+        });
         return view;
     }
 
