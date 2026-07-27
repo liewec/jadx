@@ -1,7 +1,8 @@
 package com.jadx.dexeditor.fragments;
 
-import android.app.AlertDialog;
-import android.content.DialogInterface;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -24,7 +25,9 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.jadx.dexeditor.PathConfig;
 import com.jadx.dexeditor.R;
+import com.jadx.dexeditor.adapter.EntryTreeAdapter;
 import com.jadx.dexeditor.apk.ApkBuilder;
+import com.jadx.dexeditor.model.EntryNode;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -34,7 +37,8 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * 资源页：查看 APK 内所有文件，替换资源（图标、布局、字符串），重新打包并签名。
+ * 资源页：以层级树展示 APK 内所有条目，支持展开/折叠，
+ * 替换资源（图标、布局、字符串），重新打包并签名。
  */
 public class ResourceFragment extends Fragment {
 
@@ -48,7 +52,22 @@ public class ResourceFragment extends Fragment {
     private File currentApk;
     private String selectedEntry;
     private final List<String> entries = new ArrayList<>();
-    private final EntryAdapter adapter = new EntryAdapter();
+    private final EntryTreeAdapter adapter = new EntryTreeAdapter(new EntryTreeAdapter.OnEntryClickListener() {
+        @Override
+        public void onEntryClicked(String fullPath) {
+            selectedEntry = fullPath;
+            adapter.setSelectedPath(fullPath);
+            btnReplace.setEnabled(true);
+            statusText.setText(getString(R.string.entry_selected, fullPath));
+        }
+
+        @Override
+        public boolean onEntryLongClicked(String fullPath, String displayName) {
+            copyToClipboard(displayName);
+            Toast.makeText(requireContext(), R.string.copied_to_clipboard, Toast.LENGTH_SHORT).show();
+            return true;
+        }
+    });
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
@@ -100,14 +119,15 @@ public class ResourceFragment extends Fragment {
                 Collections.sort(list);
                 entries.clear();
                 entries.addAll(list);
+                final EntryNode root = buildTree(list);
                 mainHandler.post(() -> {
                     setLoading(false);
-                    adapter.notifyDataSetChanged();
+                    adapter.setRoot(root);
                     boolean empty = entries.isEmpty();
                     recycler.setVisibility(empty ? View.GONE : View.VISIBLE);
                     emptyText.setVisibility(empty ? View.VISIBLE : View.GONE);
                     statusText.setText(getString(R.string.apk_entries, currentApk.getName(), entries.size()));
-                    btnPackSign.setEnabled(true);
+                    btnPackSign.setEnabled(!empty);
                 });
             } catch (Throwable e) {
                 mainHandler.post(() -> {
@@ -116,6 +136,55 @@ public class ResourceFragment extends Fragment {
                 });
             }
         }).start();
+    }
+
+    /** 将扁平的 APK 条目列表构建为层级树。根节点的 children 为顶层条目。 */
+    private static EntryNode buildTree(List<String> entries) {
+        EntryNode root = new EntryNode(EntryNode.TYPE_DIR, "", "", 0);
+        for (String path : entries) {
+            String[] segs = path.split("/");
+            EntryNode cur = root;
+            StringBuilder acc = new StringBuilder();
+            for (int i = 0; i < segs.length; i++) {
+                String seg = segs[i];
+                if (seg.isEmpty()) continue;
+                if (acc.length() > 0) acc.append("/");
+                acc.append(seg);
+                boolean isLast = (i == segs.length - 1);
+                int type = isLast ? EntryNode.TYPE_FILE : EntryNode.TYPE_DIR;
+                String fullPath = isLast ? path : acc + "/";
+                EntryNode child = findChild(cur, seg, type);
+                if (child == null) {
+                    child = new EntryNode(type, seg, fullPath, cur.getDepth() + 1);
+                    cur.getChildren().add(child);
+                }
+                cur = child;
+            }
+        }
+        sortTree(root);
+        // 顶层默认展开，便于看到一级目录
+        root.setExpanded(true);
+        for (EntryNode n : root.getChildren()) {
+            if (n.isDir()) n.setExpanded(true);
+        }
+        return root;
+    }
+
+    private static EntryNode findChild(EntryNode parent, String name, int type) {
+        for (EntryNode c : parent.getChildren()) {
+            if (c.getName().equals(name) && c.getType() == type) return c;
+        }
+        return null;
+    }
+
+    /** 目录在前、文件在后，各自按名称排序；递归处理子节点。 */
+    private static void sortTree(EntryNode node) {
+        List<EntryNode> children = node.getChildren();
+        Collections.sort(children, (a, b) -> {
+            if (a.isDir() != b.isDir()) return a.isDir() ? -1 : 1;
+            return a.getName().compareToIgnoreCase(b.getName());
+        });
+        for (EntryNode c : children) sortTree(c);
     }
 
     private void replaceEntry(Uri replacementUri) {
@@ -134,8 +203,6 @@ public class ResourceFragment extends Fragment {
                 }
                 File outApk = new File(PathConfig.get().getOutputDir(),
                         currentApk.getName().replace(".apk", "") + "_replaced.apk");
-                byte[] data = ApkBuilder.readEntry(tmp, ""); // not used
-                // 直接用 ApkBuilder.replaceEntry 不行（要 byte[]），改用：把 tmp 整体读入
                 byte[] bytes = readAllBytes(tmp);
                 ApkBuilder.replaceEntry(currentApk, selectedEntry, bytes, outApk);
                 currentApk = outApk;
@@ -231,43 +298,12 @@ public class ResourceFragment extends Fragment {
         if (progress != null) progress.setVisibility(loading ? View.VISIBLE : View.GONE);
     }
 
-    private final class EntryAdapter extends RecyclerView.Adapter<EntryAdapter.VH> {
-
-        @NonNull
-        @Override
-        public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            TextView tv = new TextView(parent.getContext());
-            tv.setPadding(32, 24, 32, 24);
-            tv.setTextSize(13);
-            tv.setLayoutParams(new RecyclerView.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT));
-            return new VH(tv);
-        }
-
-        @Override
-        public void onBindViewHolder(@NonNull VH holder, int position) {
-            final String name = entries.get(position);
-            ((TextView) holder.itemView).setText(name);
-            holder.itemView.setBackgroundColor(
-                    name.equals(selectedEntry) ? 0x332196F3 : 0x00000000);
-            holder.itemView.setOnClickListener(v -> {
-                selectedEntry = name;
-                notifyDataSetChanged();
-                btnReplace.setEnabled(true);
-                statusText.setText(getString(R.string.entry_selected, name));
-            });
-        }
-
-        @Override
-        public int getItemCount() {
-            return entries.size();
-        }
-
-        final class VH extends RecyclerView.ViewHolder {
-            VH(@NonNull View itemView) {
-                super(itemView);
-            }
+    private void copyToClipboard(String text) {
+        Context ctx = getContext();
+        if (ctx == null) return;
+        ClipboardManager cm = (ClipboardManager) ctx.getSystemService(Context.CLIPBOARD_SERVICE);
+        if (cm != null) {
+            cm.setPrimaryClip(ClipData.newPlainText("entry", text));
         }
     }
 }

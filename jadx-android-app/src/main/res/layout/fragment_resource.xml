@@ -47,20 +47,24 @@
         android:layout_height="wrap_content"
         android:visibility="gone" />
 
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/entry_recycler"
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1" />
+        android:layout_weight="1">
 
-    <TextView
-        android:id="@+id/empty_text"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:gravity="center"
-        android:padding="32dp"
-        android:text="@string/resource_empty"
-        android:textColor="?android:attr/textColorSecondary" />
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/entry_recycler"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <TextView
+            android:id="@+id/empty_text"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:padding="32dp"
+            android:text="@string/resource_empty"
+            android:textColor="?android:attr/textColorSecondary" />
+    </FrameLayout>
 
 </LinearLayout>
