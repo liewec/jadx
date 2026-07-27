@@ -3,6 +3,8 @@ package com.jadx.dexeditor.fragments;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
+import android.app.AlertDialog;
+import android.content.DialogInterface;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -11,6 +13,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -27,14 +30,19 @@ import com.jadx.dexeditor.PathConfig;
 import com.jadx.dexeditor.R;
 import com.jadx.dexeditor.adapter.EntryTreeAdapter;
 import com.jadx.dexeditor.apk.ApkBuilder;
+import com.jadx.dexeditor.axml.AxmlConverter;
+import com.jadx.dexeditor.axml.ArscParser;
 import com.jadx.dexeditor.model.EntryNode;
+import com.jadx.dexeditor.widget.XmlSyntaxHighlighter;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 资源页：以层级树展示 APK 内所有条目，支持展开/折叠，
@@ -45,6 +53,7 @@ public class ResourceFragment extends Fragment {
     private TextView statusText;
     private ProgressBar progress;
     private Button btnReplace;
+    private Button btnEditXml;
     private Button btnPackSign;
     private RecyclerView recycler;
     private TextView emptyText;
@@ -58,6 +67,8 @@ public class ResourceFragment extends Fragment {
             selectedEntry = fullPath;
             adapter.setSelectedPath(fullPath);
             btnReplace.setEnabled(true);
+            // 仅 .xml 条目可编辑
+            btnEditXml.setEnabled(fullPath.toLowerCase().endsWith(".xml"));
             statusText.setText(getString(R.string.entry_selected, fullPath));
         }
 
@@ -89,6 +100,7 @@ public class ResourceFragment extends Fragment {
         statusText = view.findViewById(R.id.status_text);
         progress = view.findViewById(R.id.loading_progress);
         btnReplace = view.findViewById(R.id.btn_replace);
+        btnEditXml = view.findViewById(R.id.btn_edit_xml);
         btnPackSign = view.findViewById(R.id.btn_pack_sign);
         recycler = view.findViewById(R.id.entry_recycler);
         emptyText = view.findViewById(R.id.empty_text);
@@ -104,6 +116,17 @@ public class ResourceFragment extends Fragment {
                 return;
             }
             replaceFileLauncher.launch("*/*");
+        });
+        btnEditXml.setOnClickListener(v -> {
+            if (selectedEntry == null) {
+                Toast.makeText(requireContext(), R.string.please_select_entry, Toast.LENGTH_SHORT).show();
+                return;
+            }
+            if (!selectedEntry.toLowerCase().endsWith(".xml")) {
+                Toast.makeText(requireContext(), R.string.edit_xml_only_xml, Toast.LENGTH_SHORT).show();
+                return;
+            }
+            openXmlEditor(selectedEntry);
         });
         btnPackSign.setOnClickListener(v -> packAndSign());
         return view;
@@ -162,10 +185,10 @@ public class ResourceFragment extends Fragment {
             }
         }
         sortTree(root);
-        // 顶层默认展开，便于看到一级目录
+        // 默认折叠状态（仅根节点展开，子目录默认折叠）
         root.setExpanded(true);
         for (EntryNode n : root.getChildren()) {
-            if (n.isDir()) n.setExpanded(true);
+            n.setExpanded(false);
         }
         return root;
     }
@@ -296,6 +319,123 @@ public class ResourceFragment extends Fragment {
 
     private void setLoading(boolean loading) {
         if (progress != null) progress.setVisibility(loading ? View.VISIBLE : View.GONE);
+    }
+
+    /** 打开 XML 编辑对话框：自动识别二进制 AXML 并解码为文本，保存时回写。 */
+    private void openXmlEditor(String entryPath) {
+        if (currentApk == null) return;
+        setLoading(true);
+        new Thread(() -> {
+            try {
+                byte[] data = ApkBuilder.readEntry(currentApk, entryPath);
+                if (data == null) {
+                    mainHandler.post(() -> {
+                        setLoading(false);
+                        statusText.setText("读取条目失败：" + entryPath);
+                    });
+                    return;
+                }
+                boolean binary = isBinaryAxml(data);
+                String text;
+                if (binary) {
+                    Map<Integer, String> idToName = loadArscMap();
+                    text = AxmlConverter.toTextXml(data, idToName);
+                } else {
+                    text = new String(data, StandardCharsets.UTF_8);
+                }
+                final String fText = text;
+                final boolean fBinary = binary;
+                mainHandler.post(() -> {
+                    setLoading(false);
+                    showXmlEditDialog(entryPath, fText, fBinary);
+                });
+            } catch (final Throwable e) {
+                mainHandler.post(() -> {
+                    setLoading(false);
+                    statusText.setText(getString(R.string.edit_xml_decode_failed, e.getMessage()));
+                });
+            }
+        }).start();
+    }
+
+    /** 弹出 XML 编辑对话框，含语法高亮 + 格式化按钮，保存时编码回写 */
+    private void showXmlEditDialog(String entryPath, String text, boolean wasBinary) {
+        View view = LayoutInflater.from(requireContext())
+                .inflate(R.layout.dialog_edit_xml, null);
+        EditText edit = view.findViewById(R.id.xml_edit);
+        TextView hint = view.findViewById(R.id.xml_hint_text);
+        hint.setText(wasBinary ? R.string.edit_xml_binary_hint : R.string.edit_xml_text_hint);
+        edit.setText(text);
+
+        int cTag = 0xFF1976D2;
+        int cAttr = 0xFF00897B;
+        int cValue = 0xFF6D4C41;
+        int cComment = 0xFF9E9E9E;
+        int cDecl = 0xFFEF6C00;
+        int cEntity = 0xFFC62828;
+        int cBracket = 0xFF455A64;
+        int cColor = 0xFFD81B60;
+        XmlSyntaxHighlighter highlighter = new XmlSyntaxHighlighter(edit,
+                cTag, cAttr, cValue, cComment, cDecl, cEntity, cBracket, cColor);
+        edit.addTextChangedListener(highlighter);
+
+        AlertDialog dlg = new AlertDialog.Builder(requireContext())
+                .setTitle(getString(R.string.dialog_edit_xml_title, entryPath))
+                .setView(view)
+                .setPositiveButton(android.R.string.ok, null) // 后面覆盖，避免点确定就关
+                .setNegativeButton(android.R.string.cancel, null)
+                .create();
+        dlg.show();
+        dlg.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(b -> {
+            String edited = edit.getText().toString();
+            saveXmlEntry(entryPath, edited, wasBinary, dlg);
+        });
+    }
+
+    /** 把编辑后的文本编码并替换 APK 条目 */
+    private void saveXmlEntry(String entryPath, String text, boolean wasBinary, AlertDialog dlg) {
+        setLoading(true);
+        new Thread(() -> {
+            try {
+                byte[] out;
+                if (wasBinary) {
+                    out = AxmlConverter.toBinary(text);
+                } else {
+                    out = text.getBytes(StandardCharsets.UTF_8);
+                }
+                File outApk = new File(PathConfig.get().getOutputDir(),
+                        currentApk.getName().replace(".apk", "") + "_edited.apk");
+                ApkBuilder.replaceEntry(currentApk, entryPath, out, outApk);
+                currentApk = outApk;
+                mainHandler.post(() -> {
+                    setLoading(false);
+                    statusText.setText(getString(R.string.edit_xml_saved));
+                    Toast.makeText(requireContext(), R.string.replace_success, Toast.LENGTH_SHORT).show();
+                    dlg.dismiss();
+                });
+            } catch (final Throwable e) {
+                mainHandler.post(() -> {
+                    setLoading(false);
+                    statusText.setText(getString(R.string.edit_xml_encode_failed, e.getMessage()));
+                });
+            }
+        }).start();
+    }
+
+    /** 尝试从当前 APK 读取 resources.arsc 以还原资源 ID 名称 */
+    private Map<Integer, String> loadArscMap() {
+        try {
+            byte[] arsc = ApkBuilder.readEntry(currentApk, "resources.arsc");
+            if (arsc != null) return ArscParser.parse(arsc);
+        } catch (Throwable ignored) {
+        }
+        return java.util.Collections.emptyMap();
+    }
+
+    /** 判断字节数组是否为二进制 AXML：前两字节 little-endian 为 0x0003 (RES_XML_TYPE) */
+    private static boolean isBinaryAxml(byte[] data) {
+        return data != null && data.length >= 4
+                && (data[0] & 0xff) == 0x03 && (data[1] & 0xff) == 0x00;
     }
 
     private void copyToClipboard(String text) {

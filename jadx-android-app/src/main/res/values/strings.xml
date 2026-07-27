@@ -62,6 +62,14 @@
     <string name="btn_save_manifest">保存回写</string>
     <string name="btn_format_xml">格式化</string>
     <string name="btn_replace_resource">替换资源</string>
+    <string name="btn_edit_xml">编辑XML</string>
+    <string name="dialog_edit_xml_title">编辑 XML：%1$s</string>
+    <string name="edit_xml_only_xml">仅支持编辑 .xml 条目</string>
+    <string name="edit_xml_decode_failed">解码失败：%1$s</string>
+    <string name="edit_xml_encode_failed">编码失败：%1$s</string>
+    <string name="edit_xml_saved">已保存修改，点击"打包签名"生成 APK</string>
+    <string name="edit_xml_binary_hint">（二进制 AXML，已自动解码）</string>
+    <string name="edit_xml_text_hint">（文本 XML）</string>
     <string name="btn_pack_sign">打包签名</string>
     <string name="btn_detect_packer">检测壳</string>
     <string name="btn_unpack">脱壳</string>

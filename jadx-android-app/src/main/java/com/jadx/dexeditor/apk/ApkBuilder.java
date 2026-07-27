@@ -150,7 +150,7 @@ public final class ApkBuilder {
         return outApk;
     }
 
-    /** 使用内置测试签名对 APK 进行 v1+v2+v3 签名 */
+    /** 使用内置测试签名对 APK 进行 v2+v3 签名（不生成 v1 / JAR 签名） */
     public static File signWithBuiltinKey(File inputApk, File outputApk) throws Exception {
         KeyStore ks = BuiltinKey.loadKeyStore();
         KeyStore.PrivateKeyEntry pke = (KeyStore.PrivateKeyEntry)
@@ -164,7 +164,7 @@ public final class ApkBuilder {
         return sign(inputApk, outputApk, key, certs);
     }
 
-    /** 使用指定密钥对 APK 进行 v1+v2+v3 签名 */
+    /** 使用指定密钥对 APK 进行 v2+v3 签名（不生成 v1 / JAR 签名） */
     public static File sign(File inputApk, File outputApk, PrivateKey key,
                             List<X509Certificate> certs) throws Exception {
         if (outputApk.exists()) outputApk.delete();
@@ -173,7 +173,7 @@ public final class ApkBuilder {
         ApkSigner apkSigner = new ApkSigner.Builder(Collections.singletonList(signerConfig))
                 .setInputApk(inputApk)
                 .setOutputApk(outputApk)
-                .setV1SigningEnabled(true)
+                .setV1SigningEnabled(false)
                 .setV2SigningEnabled(true)
                 .setV3SigningEnabled(true)
                 .setV4SigningEnabled(false)

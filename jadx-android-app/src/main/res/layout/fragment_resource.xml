@@ -25,6 +25,14 @@
             android:text="@string/btn_replace_resource" />
 
         <Button
+            android:id="@+id/btn_edit_xml"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:enabled="false"
+            android:text="@string/btn_edit_xml" />
+
+        <Button
             android:id="@+id/btn_pack_sign"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
