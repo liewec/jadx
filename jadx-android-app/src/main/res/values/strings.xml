@@ -57,12 +57,12 @@
     <string name="about_content">Dex 编辑器 v1.2\n\n一款基于 jadx 与 smali 3.0.9 的 Android DEX/APK 编辑器，支持 AndroidManifest 编辑、APK 资源替换与重签名、壳检测与静态脱壳。\n\n主要功能：\n• 浏览 DEX/APK 中的类结构（按包层级展示）\n• 查看类的 Smali 反汇编代码\n• 一键反编译为 Java 源码\n• 在线编辑并重新编译 Smali 代码\n• 按类名 / 方法名 / 字符串快速搜索\n• 查看 DEX 文件统计信息\n• 编辑 AndroidManifest.xml（二进制 AXML ↔ 文本 XML，资源 ID 自动转名称，语法高亮 + 自动补全）\n• 替换 APK 资源（图标、布局、字符串），层级树展示并支持展开/折叠\n• 直接编辑 APK 内 XML 条目（二进制 AXML 自动解码/回写，含语法高亮）\n• 重新打包并使用内置密钥签名 APK（v2 + v3）\n• 壳检测（360加固 / 腾讯乐固 / 爱加密 / 梆梆 / 百度 / 阿里 等）与静态脱壳\n• 自定义缓存 / 脱壳 / 成品 / 密钥库路径\n• 官方网站链接（吾爱破解论坛）\n\n技术栈：\n• 反汇编/编译：smali 3.0.9 (JesusFreke/smali, Apache-2.0)\n• Java 反编译：jadx (skylot/jadx, Apache-2.0)\n• APK 签名：apksig (Google, Apache-2.0)\n• AXML / ARSC 解析：自实现，参考 AOSP ResourceTypes.h\n• 脱壳思路参考：blackdex (codinggay/blackdex, Apache-2.0)\n• UI：AndroidX + Material Components\n\n开源致谢：\n• https://github.com/iBotPeaches/Apktool  (Apache License 2.0)\n• https://github.com/codinggay/blackdex  (Apache License 2.0)\n• https://github.com/JesusFreke/smali  (Apache License 2.0)\n• https://github.com/skylot/jadx  (Apache License 2.0)\n\n致谢：\n感谢吾爱破解 (52pojie.cn) 社区的支持。\n\n作者：空满水杯</string>
 
     <!-- Manifest / Resource / Unshell / Settings -->
-    <string name="btn_open_apk">打开\nAPK</string>
+    <string name="btn_open_apk">打开 APK</string>
     <string name="btn_decode_manifest">反编译</string>
     <string name="btn_save_manifest">保存回写</string>
     <string name="btn_format_xml">格式化</string>
-    <string name="btn_replace_resource">替换\n资源</string>
-    <string name="btn_edit_xml">编辑\nXML</string>
+    <string name="btn_replace_resource">替换资源</string>
+    <string name="btn_edit_xml">编辑XML</string>
     <string name="dialog_edit_xml_title">编辑 XML：%1$s</string>
     <string name="edit_xml_only_xml">仅支持编辑 .xml 条目</string>
     <string name="edit_xml_decode_failed">解码失败：%1$s</string>
@@ -70,7 +70,7 @@
     <string name="edit_xml_saved">已保存修改，点击"打包签名"生成 APK</string>
     <string name="edit_xml_binary_hint">（二进制 AXML，已自动解码）</string>
     <string name="edit_xml_text_hint">（文本 XML）</string>
-    <string name="btn_pack_sign">打包\n签名</string>
+    <string name="btn_pack_sign">打包签名</string>
     <string name="btn_detect_packer">检测壳</string>
     <string name="btn_unpack">脱壳</string>
     <string name="please_open_apk">请先打开 APK</string>

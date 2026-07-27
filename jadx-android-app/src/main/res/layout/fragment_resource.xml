@@ -15,9 +15,9 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:gravity="center"
-            android:maxLines="2"
-            android:text="@string/btn_open_apk" />
+            android:maxLines="1"
+            android:text="@string/btn_open_apk"
+            android:textSize="12sp" />
 
         <Button
             android:id="@+id/btn_replace"
@@ -26,9 +26,9 @@
             android:layout_marginStart="8dp"
             android:layout_weight="1"
             android:enabled="false"
-            android:gravity="center"
-            android:maxLines="2"
-            android:text="@string/btn_replace_resource" />
+            android:maxLines="1"
+            android:text="@string/btn_replace_resource"
+            android:textSize="12sp" />
 
         <Button
             android:id="@+id/btn_edit_xml"
@@ -37,9 +37,9 @@
             android:layout_marginStart="8dp"
             android:layout_weight="1"
             android:enabled="false"
-            android:gravity="center"
-            android:maxLines="2"
-            android:text="@string/btn_edit_xml" />
+            android:maxLines="1"
+            android:text="@string/btn_edit_xml"
+            android:textSize="12sp" />
 
         <Button
             android:id="@+id/btn_pack_sign"
@@ -48,9 +48,9 @@
             android:layout_marginStart="8dp"
             android:layout_weight="1"
             android:enabled="false"
-            android:gravity="center"
-            android:maxLines="2"
-            android:text="@string/btn_pack_sign" />
+            android:maxLines="1"
+            android:text="@string/btn_pack_sign"
+            android:textSize="12sp" />
     </LinearLayout>
 
     <TextView
