@@ -96,7 +96,9 @@ final class SelfSignedCertGen {
     }
 
     private static byte[] encodeName(String dn) {
-        // CN=..., O=..., C=...
+        // Name ::= SEQUENCE OF RelativeDistinguishedName
+        // RelativeDistinguishedName ::= SET OF AttributeTypeAndValue   (SET)
+        // AttributeTypeAndValue ::= SEQUENCE { type OID, value }       (SEQUENCE)
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         out.write(0x30); // SEQUENCE (Name)
         ByteArrayOutputStream nameBody = new ByteArrayOutputStream();
@@ -107,8 +109,10 @@ final class SelfSignedCertGen {
             String val = kv[1].trim();
             byte[] oid = oidForKey(key);
             if (oid == null) continue;
-            byte[] atv = derSequence(concat(oid, derSet(derUTF8String(val))));
-            nameBody.write(atv, 0, atv.length);
+            // 先 SEQUENCE{OID, value} 再用 SET 包起来
+            byte[] atv = derSequence(oid, derUTF8String(val));
+            byte[] rdnSet = derSet(atv);
+            nameBody.write(rdnSet, 0, rdnSet.length);
         }
         byte[] body = nameBody.toByteArray();
         writeLength(out, body.length);
