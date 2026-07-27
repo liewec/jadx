@@ -61,6 +61,48 @@ public final class BinaryXml {
     public static final int ATTR_TYPE_INT_DEC = 0x10;
     public static final int ATTR_TYPE_INT_BOOL = 0x12;
 
+    // 标准 chunk 头部大小（参考 AOSP ResourceTypes.h）
+    // ResXMLTree_node = ResChunk_header(8) + lineNumber(4) + comment(4) = 16
+    // 所有 XML 子 chunk（START/END_ELEMENT, CDATA, START/END_NAMESPACE）共用此 headerSize
+    private static final int HEADER_SIZE_XML = 8;
+    private static final int HEADER_SIZE_STRING_POOL = 8 + 4 * 5; // 28
+    private static final int HEADER_SIZE_XML_NODE = 0x10;         // 16 (ResXMLTree_node)
+    // START_ELEMENT 内容区：ns(4)+name(4)+attrStart(2)+attrSize(2)+attrCount(2)+idIdx(2)+classIdx(2)+styleIdx(2) = 20
+    private static final int ATTR_START_OFFSET = 0x14;            // 20 (从 contents 起始到属性数据)
+    private static final int ATTR_SIZE = 0x14;                    // 20
+    private static final int ANDROID_NS_SUFFIX_LEN = "/apk/res/android".length();
+
+    /** AndroidManifest 常用 android 命名空间属性的资源 ID（参考 frameworks/base） */
+    private static final Map<String, Integer> ANDROID_ATTR_IDS = new HashMap<>();
+    static {
+        ANDROID_ATTR_IDS.put("minSdkVersion", 0x0101020c);
+        ANDROID_ATTR_IDS.put("targetSdkVersion", 0x01010270);
+        ANDROID_ATTR_IDS.put("versionCode", 0x0101021b);
+        ANDROID_ATTR_IDS.put("versionName", 0x0101021c);
+        ANDROID_ATTR_IDS.put("name", 0x01010003);
+        ANDROID_ATTR_IDS.put("label", 0x01010001);
+        ANDROID_ATTR_IDS.put("icon", 0x01010002);
+        ANDROID_ATTR_IDS.put("theme", 0x01010000);
+        ANDROID_ATTR_IDS.put("debuggable", 0x0101000f);
+        ANDROID_ATTR_IDS.put("hasCode", 0x0101000c);
+        ANDROID_ATTR_IDS.put("allowBackup", 0x01010280);
+        ANDROID_ATTR_IDS.put("uiOptions", 0x0101029f);
+        ANDROID_ATTR_IDS.put("sharedUserId", 0x01010209);
+        ANDROID_ATTR_IDS.put("sharedUserLabel", 0x01010210);
+        ANDROID_ATTR_IDS.put("process", 0x01010010);
+        ANDROID_ATTR_IDS.put("enabled", 0x0101000e);
+        ANDROID_ATTR_IDS.put("exported", 0x01010010);
+        ANDROID_ATTR_IDS.put("permission", 0x01010006);
+        ANDROID_ATTR_IDS.put("readPermission", 0x01010008);
+        ANDROID_ATTR_IDS.put("writePermission", 0x01010009);
+        ANDROID_ATTR_IDS.put("usesCleartextTraffic", 0x010104ec);
+        ANDROID_ATTR_IDS.put("networkSecurityConfig", 0x010104ea);
+        ANDROID_ATTR_IDS.put("requestLegacyExternalStorage", 0x01010569);
+        ANDROID_ATTR_IDS.put("compileSdkVersion", 0x01010572);
+        ANDROID_ATTR_IDS.put("compileSdkVersionCodename", 0x01010573);
+        ANDROID_ATTR_IDS.put("package", 0x00000000); // 无资源 ID
+    }
+
     private BinaryXml() {
     }
 
@@ -294,12 +336,11 @@ public final class BinaryXml {
         // 收集所有字符串
         List<String> strings = new ArrayList<>();
         Map<String, Integer> stringIdx = new HashMap<>();
-        // 占位 0 号字符串（"")
+        // 占位 0 号字符串（""), 资源映射表也需要对应条目保持对齐
         strings.add("");
         stringIdx.put("", 0);
-
-        // 收集 resource IDs（按 attribute name 出现顺序）
         List<Integer> resIds = new ArrayList<>();
+        resIds.add(0); // "" 对应的资源 ID 占位
 
         // 序列化元素
         ByteArrayOutputStream body = new ByteArrayOutputStream();
@@ -316,7 +357,7 @@ public final class BinaryXml {
         }
         // null terminator for last string is already added by writeUtf8String
 
-        int stringsStart = 8 + 4 * 5 + 4 * strings.size(); // header + 5 fields + offsets
+        int stringsStart = HEADER_SIZE_STRING_POOL + 4 * strings.size(); // header + offsets
         int stringsChunkSize = stringsStart + stringsBuf.size();
         // align
         while (stringsChunkSize % 4 != 0) stringsChunkSize++;
@@ -330,7 +371,7 @@ public final class BinaryXml {
 
         // String pool chunk
         writeShort(out, RES_STRING_POOL_TYPE);
-        writeShort(out, 8 + 4 * 5); // header size
+        writeShort(out, HEADER_SIZE_STRING_POOL); // header size = 28
         writeInt(out, stringsChunkSize);
         writeInt(out, strings.size());
         writeInt(out, 0); // style count
@@ -366,24 +407,27 @@ public final class BinaryXml {
     private static void encodeElement(ByteArrayOutputStream out, Element e,
                                       List<String> strings, Map<String, Integer> stringIdx,
                                       List<Integer> resIds) throws IOException {
-        int nameIdx = internString(e.name, strings, stringIdx, resIds);
-        int nsIdx = e.ns != null ? internString(e.ns, strings, stringIdx, null) : -1;
+        // 元素名与命名空间 URI 都要入池并占用资源映射表条目（0），保持索引对齐
+        int nameIdx = internString(e.name, strings, stringIdx, resIds, 0);
+        int nsIdx = e.ns != null ? internString(e.ns, strings, stringIdx, resIds, 0) : -1;
 
         // START_ELEMENT chunk
+        // headerSize = 16 (ResXMLTree_node: type+headerSize+size+line+comment)
+        // 内容区(contents): ns(4)+name(4)+attrStart(2)+attrSize(2)+attrCount(2)+idIdx(2)+classIdx(2)+styleIdx(2) = 20
+        // 属性数据: attrCount * 20
+        // chunkSize = 16 + 20 + attrCount * 20 = 36 + attrCount * 20
         int attrCount = e.attributes.size();
-        int attrStart = 0x14; // 20
-        int attrSize = 0x14; // 20
-        int chunkSize = 8 + 4 * 4 + attrStart + attrCount * attrSize;
-        // header: type(2) + headerSize(2) + size(4)
+        int chunkSize = HEADER_SIZE_XML_NODE + ATTR_START_OFFSET + attrCount * ATTR_SIZE;
+
         writeShort(out, RES_XML_START_ELEMENT_TYPE);
-        writeShort(out, 8 + 4 * 4); // 24
+        writeShort(out, HEADER_SIZE_XML_NODE); // headerSize = 16
         writeInt(out, chunkSize);
         writeInt(out, e.lineNumber > 0 ? e.lineNumber : 1);
         writeInt(out, -1); // comment
         writeInt(out, nsIdx);
         writeInt(out, nameIdx);
-        writeShort(out, attrStart);
-        writeShort(out, attrSize);
+        writeShort(out, ATTR_START_OFFSET);   // attributeStart = 20 (从 contents 起始到属性数据)
+        writeShort(out, ATTR_SIZE);            // attributeSize = 20
         writeShort(out, attrCount);
         writeShort(out, 0); // id index
         writeShort(out, 0); // class index
@@ -395,9 +439,11 @@ public final class BinaryXml {
         int[] rawIdxArr = new int[attrCount];
         for (int i = 0; i < attrCount; i++) {
             Attribute a = e.attributes.get(i);
-            nsIdxArr[i] = a.ns != null ? internString(a.ns, strings, stringIdx, null) : -1;
-            nameIdxArr[i] = internString(a.name, strings, stringIdx, resIds);
-            rawIdxArr[i] = a.rawValue != null ? internString(a.rawValue, strings, stringIdx, null) : -1;
+            nsIdxArr[i] = a.ns != null ? internString(a.ns, strings, stringIdx, resIds, 0) : -1;
+            // android 命名空间属性使用预定义资源 ID，便于 apksig 按资源 ID 检索
+            int attrResId = lookupAttrResId(a);
+            nameIdxArr[i] = internString(a.name, strings, stringIdx, resIds, attrResId);
+            rawIdxArr[i] = a.rawValue != null ? internString(a.rawValue, strings, stringIdx, resIds, 0) : -1;
         }
         for (int i = 0; i < attrCount; i++) {
             Attribute a = e.attributes.get(i);
@@ -416,10 +462,11 @@ public final class BinaryXml {
                 encodeElement(out, (Element) child, strings, stringIdx, resIds);
             } else if (child instanceof String) {
                 String s = (String) child;
-                int sIdx = internString(s, strings, stringIdx, null);
+                int sIdx = internString(s, strings, stringIdx, resIds, 0);
+                // CDATA chunk: header(16) + data(4) + typedValue(8) = 28
                 writeShort(out, RES_XML_CDATA_TYPE);
-                writeShort(out, 8 + 4 * 2 + 8);
-                writeInt(out, 8 + 4 * 2 + 8);
+                writeShort(out, HEADER_SIZE_XML_NODE); // headerSize = 16
+                writeInt(out, HEADER_SIZE_XML_NODE + 12); // chunkSize = 28
                 writeInt(out, 1); // line
                 writeInt(out, -1); // comment
                 writeInt(out, sIdx);
@@ -430,18 +477,42 @@ public final class BinaryXml {
             }
         }
 
-        // END_ELEMENT chunk
+        // END_ELEMENT chunk: header(16) + ns(4) + name(4) = 24
         writeShort(out, RES_XML_END_ELEMENT_TYPE);
-        writeShort(out, 8 + 4 * 2);
-        writeInt(out, 8 + 4 * 2);
+        writeShort(out, HEADER_SIZE_XML_NODE); // headerSize = 16
+        writeInt(out, HEADER_SIZE_XML_NODE + 8); // chunkSize = 24
         writeInt(out, e.lineNumber > 0 ? e.lineNumber : 1);
         writeInt(out, -1);
         writeInt(out, nsIdx);
         writeInt(out, nameIdx);
     }
 
+    /** 判断属性是否属于 android 命名空间，返回对应的资源 ID（无则 0） */
+    private static int lookupAttrResId(Attribute a) {
+        if (a.ns == null) return 0;
+        // 命名空间以 "/apk/res/android" 结尾视为 android 命名空间
+        int nlen = a.ns.length();
+        if (nlen >= ANDROID_NS_SUFFIX_LEN
+                && a.ns.regionMatches(nlen - ANDROID_NS_SUFFIX_LEN, "/apk/res/android", 0, ANDROID_NS_SUFFIX_LEN)) {
+            Integer id = ANDROID_ATTR_IDS.get(a.name);
+            return id != null ? id : 0;
+        }
+        return 0;
+    }
+
     private static int internString(String s, List<String> strings,
                                     Map<String, Integer> stringIdx, List<Integer> resIds) {
+        return internString(s, strings, stringIdx, resIds, 0);
+    }
+
+    /**
+     * 把字符串注册到字符串池，并在资源映射表中追加对应条目（保持索引对齐）。
+     *
+     * @param resId 该字符串对应的资源 ID（仅对 android 命名空间属性名有意义，其余传 0）
+     */
+    private static int internString(String s, List<String> strings,
+                                    Map<String, Integer> stringIdx, List<Integer> resIds,
+                                    int resId) {
         if (s == null) return -1;
         Integer idx = stringIdx.get(s);
         if (idx != null) return idx;
@@ -449,8 +520,7 @@ public final class BinaryXml {
         strings.add(s);
         stringIdx.put(s, newIdx);
         if (resIds != null) {
-            // 占位 resource id
-            resIds.add(0);
+            resIds.add(resId);
         }
         return newIdx;
     }
