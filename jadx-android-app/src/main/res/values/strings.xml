@@ -97,4 +97,6 @@
     <string name="pref_summary_default">默认位于 Download/dex52pj 下</string>
     <string name="pref_about_title">关于 Dex 编辑器</string>
     <string name="pref_about_summary">v1.1  by.吾爱破解  空满水杯</string>
+    <string name="pref_website_title">官方网站</string>
+    <string name="pref_website_summary">官方网站：点击查看</string>
 </resources>

@@ -29,6 +29,10 @@
         <Preference
             android:title="@string/pref_about_title"
             android:summary="@string/pref_about_summary" />
+        <Preference
+            android:key="pref_official_website"
+            android:title="@string/pref_website_title"
+            android:summary="@string/pref_website_summary" />
     </PreferenceCategory>
 
 </PreferenceScreen>
