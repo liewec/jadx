@@ -15,7 +15,8 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:maxLines="1"
+            android:gravity="center"
+            android:maxLines="2"
             android:text="@string/btn_open_apk" />
 
         <Button
@@ -25,7 +26,8 @@
             android:layout_marginStart="8dp"
             android:layout_weight="1"
             android:enabled="false"
-            android:maxLines="1"
+            android:gravity="center"
+            android:maxLines="2"
             android:text="@string/btn_replace_resource" />
 
         <Button
@@ -35,7 +37,8 @@
             android:layout_marginStart="8dp"
             android:layout_weight="1"
             android:enabled="false"
-            android:maxLines="1"
+            android:gravity="center"
+            android:maxLines="2"
             android:text="@string/btn_edit_xml" />
 
         <Button
@@ -45,7 +48,8 @@
             android:layout_marginStart="8dp"
             android:layout_weight="1"
             android:enabled="false"
-            android:maxLines="1"
+            android:gravity="center"
+            android:maxLines="2"
             android:text="@string/btn_pack_sign" />
     </LinearLayout>
 
