@@ -6,6 +6,11 @@
         android:title="@string/title_info"
         app:showAsAction="never" />
     <item
+        android:id="@+id/action_mcp"
+        android:icon="@drawable/ic_mcp"
+        android:title="@string/title_mcp"
+        app:showAsAction="never" />
+    <item
         android:id="@+id/action_settings"
         android:title="@string/title_settings"
         app:showAsAction="never" />

@@ -27,6 +27,7 @@ import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.jadx.dexeditor.fragments.BrowseFragment;
 import com.jadx.dexeditor.fragments.InfoFragment;
 import com.jadx.dexeditor.fragments.ManifestFragment;
+import com.jadx.dexeditor.fragments.McpFragment;
 import com.jadx.dexeditor.fragments.ResourceFragment;
 import com.jadx.dexeditor.fragments.SearchFragment;
 import com.jadx.dexeditor.fragments.SettingsFragment;
@@ -46,6 +47,7 @@ public class MainActivity extends AppCompatActivity {
     private static final String TAG_RESOURCE = "resource";
     private static final String TAG_UNSHELL = "unshell";
     private static final String TAG_SETTINGS = "settings";
+    private static final String TAG_MCP = "mcp";
 
     private Toolbar toolbar;
     private BottomNavigationView bottomNav;
@@ -56,6 +58,7 @@ public class MainActivity extends AppCompatActivity {
     private ResourceFragment resourceFragment;
     private UnshellFragment unshellFragment;
     private SettingsFragment settingsFragment;
+    private McpFragment mcpFragment;
     private Fragment activeFragment;
     private Thread loadThread;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -97,6 +100,7 @@ public class MainActivity extends AppCompatActivity {
             resourceFragment = (ResourceFragment) fm.findFragmentByTag(TAG_RESOURCE);
             unshellFragment = (UnshellFragment) fm.findFragmentByTag(TAG_UNSHELL);
             settingsFragment = (SettingsFragment) fm.findFragmentByTag(TAG_SETTINGS);
+            mcpFragment = (McpFragment) fm.findFragmentByTag(TAG_MCP);
             activeFragment = findVisibleMainFragment();
         }
 
@@ -127,6 +131,7 @@ public class MainActivity extends AppCompatActivity {
         resourceFragment = new ResourceFragment();
         unshellFragment = new UnshellFragment();
         settingsFragment = new SettingsFragment();
+        mcpFragment = new McpFragment();
         getSupportFragmentManager().beginTransaction()
                 .add(R.id.fragment_container, browseFragment, TAG_BROWSE)
                 .add(R.id.fragment_container, searchFragment, TAG_SEARCH).hide(searchFragment)
@@ -135,6 +140,7 @@ public class MainActivity extends AppCompatActivity {
                 .add(R.id.fragment_container, unshellFragment, TAG_UNSHELL).hide(unshellFragment)
                 .add(R.id.fragment_container, infoFragment, TAG_INFO).hide(infoFragment)
                 .add(R.id.fragment_container, settingsFragment, TAG_SETTINGS).hide(settingsFragment)
+                .add(R.id.fragment_container, mcpFragment, TAG_MCP).hide(mcpFragment)
                 .commitNow();
         activeFragment = browseFragment;
     }
@@ -160,6 +166,7 @@ public class MainActivity extends AppCompatActivity {
         if (unshellFragment != null && unshellFragment.isVisible()) return unshellFragment;
         if (infoFragment != null && infoFragment.isVisible()) return infoFragment;
         if (settingsFragment != null && settingsFragment.isVisible()) return settingsFragment;
+        if (mcpFragment != null && mcpFragment.isVisible()) return mcpFragment;
         return browseFragment != null ? browseFragment : infoFragment;
     }
 
@@ -178,6 +185,10 @@ public class MainActivity extends AppCompatActivity {
         }
         if (id == R.id.action_settings) {
             switchFragment(settingsFragment);
+            return true;
+        }
+        if (id == R.id.action_mcp) {
+            switchFragment(mcpFragment);
             return true;
         }
         if (id == R.id.action_about) {

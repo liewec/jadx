@@ -8,6 +8,7 @@
     <string name="title_resource">资源</string>
     <string name="title_unshell">脱壳</string>
     <string name="title_settings">设置</string>
+    <string name="title_mcp">MCP 服务</string>
     <string name="action_open_file">打开文件</string>
     <string name="action_open_folder">打开文件夹</string>
     <string name="loading">正在加载…</string>
@@ -54,7 +55,7 @@
     <string name="toolbar_subtitle">by.吾爱破解52pojie.cn 空满水杯</string>
     <string name="action_about">关于</string>
     <string name="about_title">关于 Dex 编辑器</string>
-    <string name="about_content">Dex 编辑器 v1.2\n\n一款基于 jadx 与 smali 3.0.9 的 Android DEX/APK 编辑器，支持 AndroidManifest 编辑、APK 资源替换与重签名、壳检测与静态脱壳。\n\n主要功能：\n• 浏览 DEX/APK 中的类结构（按包层级展示）\n• 查看类的 Smali 反汇编代码\n• 一键反编译为 Java 源码\n• 在线编辑并重新编译 Smali 代码\n• 按类名 / 方法名 / 字符串快速搜索\n• 查看 DEX 文件统计信息\n• 编辑 AndroidManifest.xml（二进制 AXML ↔ 文本 XML，资源 ID 自动转名称，语法高亮 + 自动补全）\n• 替换 APK 资源（图标、布局、字符串），层级树展示并支持展开/折叠\n• 直接编辑 APK 内 XML 条目（二进制 AXML 自动解码/回写，含语法高亮）\n• 重新打包并使用内置密钥签名 APK（v2 + v3）\n• 壳检测（360加固 / 腾讯乐固 / 爱加密 / 梆梆 / 百度 / 阿里 等）与静态脱壳\n• 自定义缓存 / 脱壳 / 成品 / 密钥库路径\n• 官方网站链接（吾爱破解论坛）\n\n技术栈：\n• 反汇编/编译：smali 3.0.9 (JesusFreke/smali, Apache-2.0)\n• Java 反编译：jadx (skylot/jadx, Apache-2.0)\n• APK 签名：apksig (Google, Apache-2.0)\n• AXML / ARSC 解析：自实现，参考 AOSP ResourceTypes.h\n• 脱壳思路参考：blackdex (codinggay/blackdex, Apache-2.0)\n• UI：AndroidX + Material Components\n\n开源致谢：\n• https://github.com/iBotPeaches/Apktool  (Apache License 2.0)\n• https://github.com/codinggay/blackdex  (Apache License 2.0)\n• https://github.com/JesusFreke/smali  (Apache License 2.0)\n• https://github.com/skylot/jadx  (Apache License 2.0)\n\n致谢：\n感谢吾爱破解 (52pojie.cn) 社区的支持。\n\n作者：空满水杯</string>
+    <string name="about_content">Dex 编辑器 v1.3\n\n一款基于 jadx 与 smali 3.0.9 的 Android DEX/APK 编辑器，支持 AndroidManifest 编辑、APK 资源替换与重签名、壳检测与静态脱壳、MCP AI 服务端。\n\n主要功能：\n• 浏览 DEX/APK 中的类结构（按包层级展示）\n• 查看类的 Smali 反汇编代码\n• 一键反编译为 Java 源码\n• 在线编辑并重新编译 Smali 代码\n• 按类名 / 方法名 / 字符串快速搜索\n• 查看 DEX 文件统计信息\n• 编辑 AndroidManifest.xml（二进制 AXML ↔ 文本 XML，资源 ID 自动转名称，语法高亮 + 自动补全）\n• 替换 APK 资源（图标、布局、字符串），层级树展示并支持展开/折叠\n• 直接编辑 APK 内 XML 条目（二进制 AXML 自动解码/回写，含语法高亮）\n• 重新打包并使用内置密钥签名 APK（v2 + v3）\n• 壳检测（360加固 / 腾讯乐固 / 爱加密 / 梆梆 / 百度 / 阿里 等）与静态脱壳\n• MCP 服务端：AI 客户端（手机/电脑）通过局域网连接，调用 15 个工具分析编辑 DEX/APK（v1.3）\n• 自定义缓存 / 脱壳 / 成品 / 密钥库路径\n• 官方网站链接（吾爱破解论坛）\n\n技术栈：\n• 反汇编/编译：smali 3.0.9 (JesusFreke/smali, Apache-2.0)\n• Java 反编译：jadx (skylot/jadx, Apache-2.0)\n• APK 签名：apksig (Google, Apache-2.0)\n• MCP 服务端：NanoHTTPD + Gson，自实现 MCP 协议（Streamable HTTP + SSE）\n• AXML / ARSC 解析：自实现，参考 AOSP ResourceTypes.h\n• 脱壳思路参考：blackdex (codinggay/blackdex, Apache-2.0)\n• UI：AndroidX + Material Components\n\n开源致谢：\n• https://github.com/iBotPeaches/Apktool  (Apache License 2.0)\n• https://github.com/codinggay/blackdex  (Apache License 2.0)\n• https://github.com/JesusFreke/smali  (Apache License 2.0)\n• https://github.com/skylot/jadx  (Apache License 2.0)\n\n致谢：\n感谢吾爱破解 (52pojie.cn) 社区的支持。\n\n作者：空满水杯</string>
 
     <!-- Manifest / Resource / Unshell / Settings -->
     <string name="btn_open_apk">打开 APK</string>
@@ -104,7 +105,32 @@
     <string name="pref_keystore_dir_title">签名密钥目录</string>
     <string name="pref_summary_default">默认位于 Download/dex52pj 下</string>
     <string name="pref_about_title">关于 Dex 编辑器</string>
-    <string name="pref_about_summary">v1.2  by.吾爱破解  空满水杯</string>
+    <string name="pref_about_summary">v1.3  by.吾爱破解  空满水杯</string>
     <string name="pref_website_title">官方网站</string>
     <string name="pref_website_summary">官方网站：点击查看</string>
+
+    <!-- MCP 服务 -->
+    <string name="btn_start_mcp">启动服务</string>
+    <string name="btn_stop_mcp">停止服务</string>
+    <string name="mcp_port_label">端口</string>
+    <string name="mcp_port_default">33333</string>
+    <string name="mcp_port_invalid">端口无效（1024–65535）</string>
+    <string name="mcp_running">● MCP 服务运行中：%1$s:%2$d（AI 客户端可连接）</string>
+    <string name="mcp_stopped">○ 服务未启动。点击\"启动服务\"后，手机/电脑上的 AI 软件即可通过 MCP 协议连接本应用。</string>
+    <string name="mcp_url_detail">Streamable HTTP: http://%1$s:%2$d/mcp\n传统 SSE: http://%1$s:%2$d/sse\n（点击复制 Streamable HTTP 地址）</string>
+    <string name="mcp_log_title">服务日志</string>
+    <string name="mcp_log_empty">（暂无日志）</string>
+    <string name="mcp_notif_channel">MCP 服务</string>
+    <string name="mcp_notif_channel_desc">MCP 服务端前台运行通知</string>
+    <string name="mcp_notif_title">Dex 编辑器 MCP 服务运行中</string>
+
+    <!-- MCP 使用教程 -->
+    <string name="mcp_tutorial_title">使用教程</string>
+    <string name="mcp_tutorial_intro">MCP（Model Context Protocol）是 AI 客户端与工具的标准协议。本应用作为 MCP 服务端，把 DEX/APK 分析与编辑能力（15 个工具）开放给 AI：加载文件、浏览类、看 Smali / 反编译 Java、搜索代码、读改 AndroidManifest、替换 APK 资源、检测壳、签名 APK 等。让手机上的 AI 助手（或同局域网的电脑 AI）直接帮你逆向分析。</string>
+    <string name="mcp_tutorial_step1">① 启动服务：设置端口（默认 33333），点击\"启动服务\"，状态变为运行中并显示本机地址。前台服务保持联网，切到其他应用也不会中断。</string>
+    <string name="mcp_tutorial_step2">② 手机端 AI 软件连接：在支持 MCP 的 AI App（如 Claude、ChatMCP 等）中添加 MCP 服务器，类型选 \"Streamable HTTP\"（或 \"HTTP\"），地址填：http://本机IP:33333/mcp ；老版本客户端选 \"SSE\" 类型则填：http://本机IP:33333/sse 。手机与 AI 软件需在同一台设备或同一 Wi-Fi 局域网。</string>
+    <string name="mcp_tutorial_step3">③ 电脑端连接（可选）：电脑与手机连同一 Wi-Fi，在 Claude Desktop / Cursor 等的 MCP 配置中添加：\n{\n  \"mcpServers\": {\n    \"dex-editor\": {\n      \"url\": \"http://手机IP:33333/mcp\"\n    }\n  }\n}\n手机 IP 可在\"设置 → WLAN → 当前网络\"查看，或直接复制上方地址。</string>
+    <string name="mcp_tutorial_step4">④ 开始对话：连接成功后对 AI 说，例如：\"加载 /storage/emulated/0/Download/app.apk 并分析它的入口 Activity\"、\"把 targetSdkVersion 改成 34 并重新签名\"、\"反编译 com.example.MainActivity 给我看代码\"。AI 会自动调用 get_status / load_file / read_manifest / decompile_class / sign_apk 等工具。</string>
+    <string name="mcp_tutorial_step5">⑤ 用完关闭：返回本页点击\"停止服务\"（或关闭通知），避免长期开放端口。</string>
+    <string name="mcp_tutorial_security">安全提示：服务无鉴权，局域网内任何设备都可访问；仅在受信任网络中使用，用完即关。修改类文件输出到 Download/dex52pj/output 目录。</string>
 </resources>

@@ -15,8 +15,8 @@ android {
         applicationId = "com.jadx.dexeditor"
         minSdk = 26
         targetSdk = 34
-        versionCode = 3
-        versionName = "1.2"
+        versionCode = 4
+        versionName = "1.3"
     }
 
     buildTypes {
@@ -78,6 +78,10 @@ dependencies {
     }
     // APK 签名 (v1/v2/v3)
     implementation("com.android.tools.build:apksig:8.5.0")
+
+    // MCP 服务端 (HTTP 服务器 + JSON 解析)
+    implementation("org.nanohttpd:nanohttpd:2.3.1")
+    implementation("com.google.code.gson:gson:2.10.1")
 
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("androidx.activity:activity-ktx:1.9.0")

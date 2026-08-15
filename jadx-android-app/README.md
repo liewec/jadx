@@ -2,7 +2,7 @@
 
 > by.吾爱破解52pojie.cn 空满水杯
 
-一款基于 jadx 与 smali 3.0.9 的 Android 端 DEX/APK 编辑器，支持反汇编、反编译、编辑与重新编译，并集成 AndroidManifest 编辑、APK 资源替换、重签名、壳检测与脱壳等能力。
+一款基于 jadx 与 smali 3.0.9 的 Android 端 DEX/APK 编辑器，支持反汇编、反编译、编辑与重新编译，并集成 AndroidManifest 编辑、APK 资源替换、重签名、壳检测与脱壳、MCP AI 服务端等能力。
 
 ---
 
@@ -13,6 +13,8 @@ Dex 编辑器是一款运行于 Android 设备上的 DEX/APK 文件查看与编�
 v1.1 起，进一步集成了 AndroidManifest.xml 二进制 ↔ 文本互转、APK 资源（图标/布局/字符串）替换、APK 重新打包与签名、加壳 APK 检测与静态脱壳，以及自定义缓存/脱壳/成品文件路径等能力，参考 Apktool 与 BlackDex 两个开源项目（均为 Apache License 2.0）。
 
 v1.2 起，APK 资源页改为层级树展示（默认折叠，支持展开/折叠）；支持直接编辑 APK 内 XML 条目（二进制 AXML 自动解码/回写，含语法高亮）；打包签名仅使用 v2 + v3 方案；设置页新增官方网站链接（吾爱破解论坛）。
+
+v1.3 起，新增 **MCP（Model Context Protocol）服务端**：手机或同局域网电脑上的 AI 软件（Claude、ChatMCP、Cursor 等）可通过 MCP 协议连接本应用，调用 15 个工具完成加载分析 DEX/APK、反编译看代码、读改 AndroidManifest、替换资源、检测壳、重签名等操作——让 AI 直接帮你做逆向。
 
 本软件面向 Android 逆向爱好者与开发者，特别感谢 **吾爱破解（52pojie.cn）** 社区的支持。
 
@@ -29,6 +31,7 @@ v1.2 起，APK 资源页改为层级树展示（默认折叠，支持展开/折�
 - **脱壳界面**：自动检测加壳 APK 并执行静态脱壳，输出可编辑的 DEX
 - **信息界面**：显示文件名、大小、类/方法/字段/字符串/包数量等统计信息
 - **设置界面**：自定义缓存 / 脱壳 / 成品 / 密钥库路径（默认 `Download/dex52pj`），含官方网站链接
+- **MCP 服务界面**（v1.3）：一键启动/停止 MCP 服务端，显示局域网地址与实时日志，内置使用教程
 - **代码界面**：Smali 反汇编视图与 Java 反编译视图一键切换，支持编辑与编译
 - **关于对话框**：通过工具栏菜单"关于"打开，展示软件说明
 
@@ -104,6 +107,33 @@ v1.2 起，APK 资源页改为层级树展示（默认折叠，支持展开/折�
 ### 官方网站（v1.2 新增）
 - 设置页"关于"分类下新增官方网站链接
 - 点击跳转浏览器打开吾爱破解论坛帖子页
+
+### MCP 服务端（v1.3 新增）
+
+让 AI 成为你的逆向助手：本应用内置 MCP（Model Context Protocol）服务端，手机或同局域网电脑上的 AI 客户端（Claude / ChatMCP / Cursor 等）连接后，可调用以下 15 个工具：
+
+| 工具 | 功能 |
+|------|------|
+| `get_status` | 获取当前状态（已加载文件、类/方法/字段统计、输出目录） |
+| `load_file` | 加载手机上的 DEX/APK 文件 |
+| `list_classes` | 分页列出类（支持前缀过滤） |
+| `search_code` | 按类名/方法名/字符串搜索 |
+| `get_smali` | 获取类的 Smali 反汇编代码 |
+| `decompile_class` | 反编译类为 Java 源码（jadx） |
+| `compile_smali` | 编译 Smali 代码为 DEX |
+| `list_dir` | 浏览手机目录（查找 APK/DEX） |
+| `list_apk_entries` | 列出 APK 内所有条目 |
+| `read_apk_entry` | 读取 APK 条目（文本/base64/AXML 自动解码） |
+| `read_manifest` | 读取 AndroidManifest.xml（资源 ID 还原名称） |
+| `write_manifest` | 修改 Manifest 并回写新 APK |
+| `replace_apk_entry` | 替换 APK 条目（文本/二进制，AXML 自动编码） |
+| `detect_packer` | 检测加壳（360/腾讯乐固/爱加密等） |
+| `sign_apk` | 内置密钥签名 APK（v2+v3） |
+
+- **双传输兼容**：同时支持 Streamable HTTP（`POST /mcp`，MCP 2025-03-26 规范）与传统 SSE（`GET /sse`，2024-11-05 规范），新旧客户端均可连接
+- **前台服务保活**：切到 AI 应用后服务不中断
+- **实时日志**：服务页实时显示请求日志（方法名、SSE 会话、异常）
+- **状态共享**：与 UI 共享 DexLoader 单例，AI 可直接分析你在应用里打开的文件
 
 ### 其他特性
 - 异步加载：文件加载、反编译、反汇编均在后台线程执行，不阻塞 UI
@@ -217,6 +247,70 @@ v1.2 起，APK 资源页改为层级树展示（默认折叠，支持展开/折�
 2. 选择 **关于**
 3. 查看软件说明、功能列表、技术栈、致谢等信息
 
+### 4.14 MCP 服务 + 手机 AI 软件联动（v1.3 新增）
+
+MCP（Model Context Protocol）是 AI 客户端与外部工具交互的标准协议。本应用作为 **MCP 服务端** 运行，把 DEX/APK 的分析与编辑能力开放给 AI——手机上的 AI 助手或同局域网的电脑 AI 都能连接，直接指挥本应用完成逆向任务。
+
+#### 第一步：启动 MCP 服务
+
+1. 点击工具栏溢出菜单（三个点）→ **MCP 服务**
+2. 确认端口（默认 `33333`，可自定义 1024–65535）
+3. 点击 **启动服务**，首次会请求通知权限（用于前台服务常驻）
+4. 状态变为 "● MCP 服务运行中"，页面显示局域网地址，例如：
+   - Streamable HTTP：`http://192.168.1.5:33333/mcp`
+   - 传统 SSE：`http://192.168.1.5:33333/sse`
+
+> 启动后可切换到其他应用，前台服务保持运行；通知栏常驻 "Dex 编辑器 MCP 服务运行中"。
+
+#### 第二步：手机端 AI 软件连接
+
+1. 在手机上安装任意支持 MCP 的 AI 客户端（如 Claude 移动版、ChatMCP、其他支持自定义 MCP Server 的 AI App）
+2. 在其 **MCP 服务器 / MCP 设置** 中新增服务器：
+   - 类型选择 **Streamable HTTP**（或 HTTP）：URL 填 `http://127.0.0.1:33333/mcp`（同一台手机）
+   - 若 AI 软件与手机不在同一设备，改用手机的局域网 IP：`http://<手机IP>:33333/mcp`
+   - 老版本客户端仅支持 **SSE** 类型：URL 填 `http://<手机IP>:33333/sse`
+3. 连接成功后，AI 会发现 15 个工具（get_status / load_file / decompile_class …）
+
+> 手机 IP 查看方式：系统设置 → WLAN → 点击当前网络 → 查看 IP 地址。MCP 服务页显示的地址即当前 IP。
+
+#### 第三步：电脑端 AI 连接（可选）
+
+电脑与手机连接同一 Wi-Fi，在 Claude Desktop / Cursor 等的 MCP 配置文件中添加：
+
+```json
+{
+  "mcpServers": {
+    "dex-editor": {
+      "url": "http://192.168.1.5:33333/mcp"
+    }
+  }
+}
+```
+
+（把 `192.168.1.5` 换成你手机的局域网 IP）
+
+#### 第四步：开始对话
+
+对 AI 直接下达逆向任务，例如：
+
+- "加载 `/storage/emulated/0/Download/app.apk`，分析它的入口 Activity 和权限列表"
+- "把 manifest 的 `targetSdkVersion` 改成 34，输出新 APK 并签名"
+- "反编译 `com.example.MainActivity`，解释它的网络请求逻辑"
+- "搜索字符串 `api.weixin` 看看哪些类在用"
+- "检测这个 APK 有没有加壳"
+
+AI 会自动组合调用工具：`load_file` → `read_manifest` / `search_code` → `decompile_class` → `write_manifest` → `sign_apk`，产物输出到 `Download/dex52pj/output`。
+
+#### 第五步：用完关闭
+
+返回 MCP 服务页点击 **停止服务**（或划掉通知），避免端口长期开放。
+
+#### 安全提示
+
+- 服务**无鉴权**，同一局域网内任何设备都可访问，请仅在可信网络使用
+- AI 可读取被分析的 APK 内容（含其中的字符串/密钥），注意敏感样本
+- 修改/签名产物均落在 `Download/dex52pj/output`，不会动原文件
+
 ---
 
 ## 5. 核心技术架构
@@ -226,12 +320,16 @@ v1.2 起，APK 资源页改为层级树展示（默认折叠，支持展开/折�
 ```
 ┌──────────────────────────────────────────────────────────┐
 │                         UI 层                            │
-│  MainActivity + 7 Fragment + Adapters                    │
+│  MainActivity + 8 Fragment + Adapters                    │
 │  Browse / Search / Manifest / Resource / Unshell /       │
-│  Info / Settings                                          │
+│  Info / Settings / MCP                                    │
 ├──────────────────────────────────────────────────────────┤
 │                         业务层                           │
 │  DexLoader（单例）+ SmaliUtils + PathConfig              │
+├──────────────────────────────────────────────────────────┤
+│                    MCP 服务层（v1.3 新增）               │
+│  McpServer（NanoHTTPD + JSON-RPC，Streamable HTTP + SSE）│
+│  McpTools（15 个工具，复用业务层）+ McpService（前台服务）│
 ├──────────────────────────────────────────────────────────┤
 │                       APK 处理层                         │
 │  ApkBuilder（解包/打包/签名）+ Unpacker（脱壳）          │
@@ -304,6 +402,11 @@ v1.2 起，APK 资源页改为层级树展示（默认折叠，支持展开/折�
 - 默认 `Download/dex52pj`
 - 通过 `PreferenceFragment` 持久化
 
+#### McpServer / McpTools / McpService（MCP 服务端，v1.3 新增）
+- `McpServer`：基于 NanoHTTPD 的 MCP 协议实现，支持 Streamable HTTP（`POST /mcp` 无状态 JSON-RPC）与传统 SSE（`GET /sse` + `POST /message?sessionId=xxx`，队列+管道驱动 chunked 流）双传输；支持 `initialize` / `ping` / `tools/list` / `tools/call` / `resources/list` / `prompts/list` 与 JSON-RPC 批量请求
+- `McpTools`：15 个工具的元数据（名称/描述/JSON Schema）与执行分发；复用 DexLoader / SmaliUtils / ApkBuilder / AxmlConverter / ArscParser / Unpacker / PathConfig，与 UI 共享状态；错误以 `isError=true` 的文本内容返回给 AI
+- `McpService`：前台服务（`dataSync` 类型）承载 McpServer 生命周期，常驻通知显示访问地址
+
 ### 5.3 异步处理
 
 所有耗时操作均通过 `ExecutorService`（单线程）+ `Handler`（主线程回调）实现异步：
@@ -333,6 +436,8 @@ v1.2 起，APK 资源页改为层级树展示（默认折叠，支持展开/折�
 | smali | 3.0.9 | Smali 反汇编/编译 | `https://github.com/JesusFreke/smali` |
 | smali-baksmali | 3.0.9 | baksmali 反汇编引擎 | `https://github.com/JesusFreke/smali` |
 | apksig | 8.5.0 | APK 签名（v1/v2/v3） | `https://android.googlesource.com/platform/tools/base/` |
+| NanoHTTPD | 2.3.1 | MCP 服务端 HTTP 服务器 | `https://github.com/NanoHttpd/nanohttpd` |
+| Gson | 2.10.1 | JSON-RPC 序列化/反序列化 | `https://github.com/google/gson` |
 
 ### AXML / ARSC / 脱壳（v1.1 新增，自实现）
 
@@ -378,6 +483,24 @@ v1.2 起，APK 资源页改为层级树展示（默认折叠，支持展开/折�
 ---
 
 ## 7. 更新日志
+
+### v1.3（2026-08-15）
+
+#### 新功能
+- **MCP（Model Context Protocol）服务端**
+  - 手机端 / 同局域网电脑端的 AI 软件（Claude、ChatMCP、Cursor 等）可通过 MCP 协议连接本应用，直接调用 DEX/APK 分析与编辑能力
+  - 双传输兼容：Streamable HTTP（`POST /mcp`，MCP 2025-03-26 规范）+ 传统 SSE（`GET /sse`，2024-11-05 规范）
+  - 完整 JSON-RPC 2.0：`initialize` / `ping` / `tools/list` / `tools/call` / `resources/list` / `prompts/list`，支持批量请求与通知
+  - **15 个 MCP 工具**：get_status / load_file / list_classes / search_code / get_smali / decompile_class / compile_smali / list_dir / list_apk_entries / read_apk_entry / read_manifest / write_manifest / replace_apk_entry / detect_packer / sign_apk
+  - 读取 APK 条目自动识别二进制 AXML 并解码为文本；文本方式替换 XML 条目时自动重新编码
+  - 前台服务保活（dataSync 类型），切换应用后服务不中断；常驻通知显示访问地址
+  - 与 UI 共享 DexLoader 单例状态：AI 可直接分析应用内已打开的文件
+- **MCP 服务页**：工具栏菜单新增入口；端口可配置（默认 33333）；实时请求日志；点击复制连接地址；内置使用教程（手机端/电脑端连接配置、对话示例、安全提示）
+
+#### 技术变更
+- 新增依赖：NanoHTTPD 2.3.1（HTTP 服务器）、Gson 2.10.1（JSON 处理）
+- AndroidManifest 新增 INTERNET / ACCESS_NETWORK_STATE / ACCESS_WIFI_STATE / FOREGROUND_SERVICE(_DATA_SYNC) / POST_NOTIFICATIONS 权限与 `McpService` 服务声明
+- 服务器实现：`mcp` 包（McpServer / McpTools / McpService）
 
 ### v1.2（2026-07-27）
 
