@@ -15,8 +15,8 @@ android {
         applicationId = "com.jadx.dexeditor"
         minSdk = 26
         targetSdk = 34
-        versionCode = 5
-        versionName = "1.3.1"
+        versionCode = 6
+        versionName = "1.3.2"
     }
 
     buildTypes {
