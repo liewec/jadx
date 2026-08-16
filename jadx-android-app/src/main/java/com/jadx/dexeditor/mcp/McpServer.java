@@ -38,7 +38,7 @@ import fi.iki.elonen.NanoHTTPD;
 public class McpServer extends NanoHTTPD {
 
     public static final String SERVER_NAME = "dex-editor-mcp";
-    public static final String SERVER_VERSION = "1.3.2";
+    public static final String SERVER_VERSION = "1.3.3";
     public static final int DEFAULT_PORT = 33333;
 
     /** SSE 会话表（传统 HTTP+SSE 传输） */
