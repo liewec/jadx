@@ -59,15 +59,78 @@
             android:textColor="?android:attr/textColorSecondary"
             android:textSize="13sp" />
 
-        <TextView
-            android:id="@+id/mcp_url_text"
+        <!-- 服务地址：本地 / 局域网双地址，分别复制 -->
+        <LinearLayout
+            android:id="@+id/mcp_url_section"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:fontFamily="monospace"
-            android:paddingTop="4dp"
-            android:textIsSelectable="true"
-            android:textSize="13sp"
-            android:visibility="gone" />
+            android:orientation="vertical"
+            android:paddingTop="8dp"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/mcp_addr_local_label"
+                android:textColor="?android:attr/textColorSecondary"
+                android:textSize="12sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/mcp_url_local"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:fontFamily="monospace"
+                    android:textIsSelectable="true"
+                    android:textSize="13sp" />
+
+                <Button
+                    android:id="@+id/btn_mcp_copy_local"
+                    style="?attr/borderlessButtonStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:minWidth="0dp"
+                    android:text="@string/btn_copy" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="4dp"
+                android:text="@string/mcp_addr_lan_label"
+                android:textColor="?android:attr/textColorSecondary"
+                android:textSize="12sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/mcp_url_lan"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:fontFamily="monospace"
+                    android:textIsSelectable="true"
+                    android:textSize="13sp" />
+
+                <Button
+                    android:id="@+id/btn_mcp_copy_lan"
+                    style="?attr/borderlessButtonStyle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:minWidth="0dp"
+                    android:text="@string/btn_copy" />
+            </LinearLayout>
+        </LinearLayout>
 
         <!-- 服务日志 -->
         <TextView
@@ -91,7 +154,7 @@
             android:textIsSelectable="true"
             android:textSize="11sp" />
 
-        <!-- 使用教程 -->
+        <!-- 使用教程（整体可选择复制） -->
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -102,51 +165,17 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:paddingTop="4dp"
-            android:text="@string/mcp_tutorial_intro"
-            android:textSize="13sp" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:paddingTop="8dp"
-            android:text="@string/mcp_tutorial_step1"
-            android:textSize="13sp" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:paddingTop="8dp"
-            android:text="@string/mcp_tutorial_step2"
-            android:textSize="13sp" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:paddingTop="8dp"
-            android:text="@string/mcp_tutorial_step3"
-            android:textSize="13sp" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:paddingTop="8dp"
-            android:text="@string/mcp_tutorial_step4"
-            android:textSize="13sp" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:paddingTop="8dp"
-            android:text="@string/mcp_tutorial_step5"
-            android:textSize="13sp" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:paddingTop="8dp"
-            android:text="@string/mcp_tutorial_security"
+            android:paddingTop="2dp"
+            android:text="@string/mcp_tutorial_hint"
             android:textColor="?android:attr/textColorSecondary"
-            android:textSize="12sp" />
+            android:textSize="11sp" />
+
+        <TextView
+            android:id="@+id/mcp_tutorial_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingTop="4dp"
+            android:textIsSelectable="true"
+            android:textSize="13sp" />
     </LinearLayout>
 </ScrollView>

@@ -9,7 +9,10 @@ import java.io.IOException;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -35,7 +38,7 @@ import fi.iki.elonen.NanoHTTPD;
 public class McpServer extends NanoHTTPD {
 
     public static final String SERVER_NAME = "dex-editor-mcp";
-    public static final String SERVER_VERSION = "1.3.0";
+    public static final String SERVER_VERSION = "1.3.1";
     public static final int DEFAULT_PORT = 33333;
 
     /** SSE 会话表（传统 HTTP+SSE 传输） */
@@ -43,6 +46,16 @@ public class McpServer extends NanoHTTPD {
 
     /** UI 日志回调（弱引用式：由 Fragment 注册/注销） */
     private volatile LogListener logListener;
+
+    /**
+     * 全局日志环形缓冲（静态）。
+     * <p>
+     * 无论 UI 是否在前台，日志始终写入缓冲：用户切到 AI 软件期间（本应用后台、
+     * 监听器已注销）产生的请求日志不会丢失，返回服务页时可完整回看。
+     */
+    private static final StringBuilder LOG_BUFFER = new StringBuilder();
+    private static final int LOG_BUFFER_MAX = 16000;
+    private static final SimpleDateFormat TIME_FMT = new SimpleDateFormat("HH:mm:ss", Locale.US);
 
     public interface LogListener {
         void onLog(String line);
@@ -60,10 +73,40 @@ public class McpServer extends NanoHTTPD {
         return getListeningPort() > 0 ? getListeningPort() : DEFAULT_PORT;
     }
 
-    private void log(String line) {
+    /** 记录一条服务日志：写入静态缓冲（持久），并回调 UI 监听器（若在前台） */
+    void log(String line) {
+        String stamped = stamp(line);
+        appendBuffer(stamped);
         LogListener l = logListener;
         if (l != null) {
-            l.onLog(line);
+            l.onLog(stamped);
+        }
+    }
+
+    /** 静态日志：无需服务器实例即可记录（服务启动失败等场景） */
+    public static void logStatic(String line) {
+        appendBuffer(stamp(line));
+    }
+
+    /** 获取日志快照（含后台期间产生的日志），供 UI 回看 */
+    public static String getLogSnapshot() {
+        synchronized (LOG_BUFFER) {
+            return LOG_BUFFER.toString();
+        }
+    }
+
+    private static String stamp(String line) {
+        synchronized (TIME_FMT) {
+            return TIME_FMT.format(new Date()) + " " + line;
+        }
+    }
+
+    private static void appendBuffer(String stamped) {
+        synchronized (LOG_BUFFER) {
+            LOG_BUFFER.append(stamped).append('\n');
+            if (LOG_BUFFER.length() > LOG_BUFFER_MAX) {
+                LOG_BUFFER.delete(0, LOG_BUFFER.length() - 12000);
+            }
         }
     }
 

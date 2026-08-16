@@ -94,9 +94,11 @@ public class McpService extends Service {
             // timeout=15000: SSE 长连接保持；daemon=false 由服务生命周期管理
             server.start(15000, false);
             runningServer = server;
+            server.log("✓ MCP 服务已启动: http://" + McpServer.getLanIp() + ":" + port + "/mcp");
             startForegroundCompat(port);
         } catch (IOException e) {
             runningServer = null;
+            McpServer.logStatic("✗ MCP 服务启动失败（端口 " + port + "）: " + e);
             stopSelf();
         }
         return START_STICKY;
@@ -136,6 +138,7 @@ public class McpService extends Service {
         McpServer s = runningServer;
         runningServer = null;
         if (s != null) {
+            s.log("■ MCP 服务已停止");
             s.closeAllSessions();
             s.stop();
         }

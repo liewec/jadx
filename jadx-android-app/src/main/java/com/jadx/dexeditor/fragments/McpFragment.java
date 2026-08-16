@@ -15,6 +15,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -30,7 +31,8 @@ import com.jadx.dexeditor.mcp.McpServer;
 import com.jadx.dexeditor.mcp.McpService;
 
 /**
- * MCP 服务页：启动/停止服务端、查看状态与日志、内置使用教程。
+ * MCP 服务页：启动/停止服务端、查看状态与日志（后台使用后可完整回看）、
+ * 本地/局域网双地址一键复制、内置可整体选择复制的使用教程。
  */
 public class McpFragment extends Fragment {
 
@@ -38,8 +40,11 @@ public class McpFragment extends Fragment {
     private Button btnStart;
     private Button btnStop;
     private TextView statusText;
-    private TextView urlText;
+    private LinearLayout urlSection;
+    private TextView urlLocalText;
+    private TextView urlLanText;
     private TextView logText;
+    private TextView tutorialText;
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final StringBuilder logBuffer = new StringBuilder();
@@ -58,8 +63,11 @@ public class McpFragment extends Fragment {
         btnStart = view.findViewById(R.id.btn_mcp_start);
         btnStop = view.findViewById(R.id.btn_mcp_stop);
         statusText = view.findViewById(R.id.mcp_status_text);
-        urlText = view.findViewById(R.id.mcp_url_text);
+        urlSection = view.findViewById(R.id.mcp_url_section);
+        urlLocalText = view.findViewById(R.id.mcp_url_local);
+        urlLanText = view.findViewById(R.id.mcp_url_lan);
         logText = view.findViewById(R.id.mcp_log_text);
+        tutorialText = view.findViewById(R.id.mcp_tutorial_text);
         logText.setMovementMethod(new ScrollingMovementMethod());
 
         btnStart.setOnClickListener(v -> onStartClicked());
@@ -68,12 +76,32 @@ public class McpFragment extends Fragment {
             // 稍后刷新状态
             mainHandler.postDelayed(this::refreshUi, 400);
         });
-        urlText.setOnClickListener(v -> copyUrl());
-        urlText.setOnLongClickListener(v -> {
-            copyUrl();
-            return true;
-        });
+        view.findViewById(R.id.btn_mcp_copy_local).setOnClickListener(v ->
+                copyText(urlLocalText.getText().toString(), R.string.mcp_copied_local));
+        view.findViewById(R.id.btn_mcp_copy_lan).setOnClickListener(v ->
+                copyText(urlLanText.getText().toString(), R.string.mcp_copied_lan));
+        // 点击地址本身也可复制
+        urlLocalText.setOnClickListener(v ->
+                copyText(urlLocalText.getText().toString(), R.string.mcp_copied_local));
+        urlLanText.setOnClickListener(v ->
+                copyText(urlLanText.getText().toString(), R.string.mcp_copied_lan));
+
+        buildTutorial();
         return view;
+    }
+
+    /** 整个教程合并为一段可选择复制的文本 */
+    private void buildTutorial() {
+        int[] parts = {R.string.mcp_tutorial_intro, R.string.mcp_tutorial_step1,
+                R.string.mcp_tutorial_step2, R.string.mcp_tutorial_step3,
+                R.string.mcp_tutorial_step4, R.string.mcp_tutorial_step5,
+                R.string.mcp_tutorial_security};
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < parts.length; i++) {
+            if (i > 0) sb.append("\n\n");
+            sb.append(getString(parts[i]));
+        }
+        tutorialText.setText(sb);
     }
 
     private void onStartClicked() {
@@ -93,9 +121,8 @@ public class McpFragment extends Fragment {
     }
 
     private void startServiceNow() {
-        appendLog("启动服务，端口 " + pendingPort + " …");
         McpService.start(requireContext(), pendingPort);
-        // 服务启动是异步的：延迟刷新几次状态
+        // 服务启动是异步的：延迟刷新几次状态（启动成功/失败日志由服务写入）
         mainHandler.postDelayed(this::refreshUi, 300);
         mainHandler.postDelayed(this::refreshUi, 900);
         mainHandler.postDelayed(this::refreshUi, 1800);
@@ -110,14 +137,13 @@ public class McpFragment extends Fragment {
         }
     }
 
-    private void copyUrl() {
-        CharSequence cs = urlText.getText();
-        if (cs == null || cs.length() == 0) return;
+    private void copyText(String text, int toastRes) {
+        if (text == null || text.isEmpty()) return;
         ClipboardManager cm = (ClipboardManager) requireContext()
                 .getSystemService(Context.CLIPBOARD_SERVICE);
         if (cm != null) {
-            cm.setPrimaryClip(ClipData.newPlainText("MCP URL", cs));
-            Toast.makeText(requireContext(), R.string.copied_to_clipboard, Toast.LENGTH_SHORT).show();
+            cm.setPrimaryClip(ClipData.newPlainText("MCP URL", text));
+            Toast.makeText(requireContext(), toastRes, Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -125,6 +151,8 @@ public class McpFragment extends Fragment {
     public void onResume() {
         super.onResume();
         refreshUi();
+        reloadLog();
+        // 重新挂上日志监听（后台期间产生的日志由 reloadLog 从静态缓冲补齐）
         McpServer server = McpService.getRunningServer();
         if (server != null) {
             server.setLogListener(this::appendLog);
@@ -150,13 +178,28 @@ public class McpFragment extends Fragment {
             int port = server != null ? server.getPort() : McpServer.DEFAULT_PORT;
             String ip = McpServer.getLanIp();
             statusText.setText(getString(R.string.mcp_running, ip, port));
-            urlText.setText(getString(R.string.mcp_url_detail, ip, port));
-            urlText.setVisibility(View.VISIBLE);
-            server.setLogListener(this::appendLog);
+            // 本地地址：AI 软件与本应用在同一台手机时使用
+            urlLocalText.setText(getString(R.string.mcp_url_local_value, port));
+            // 局域网地址：AI 软件在电脑/其他设备时使用
+            urlLanText.setText(getString(R.string.mcp_url_lan_value, ip, port));
+            urlSection.setVisibility(View.VISIBLE);
+            if (isResumed() && server != null) {
+                server.setLogListener(this::appendLog);
+            }
         } else {
             statusText.setText(R.string.mcp_stopped);
-            urlText.setVisibility(View.GONE);
+            urlSection.setVisibility(View.GONE);
         }
+    }
+
+    /** 从服务端静态缓冲重载日志（后台使用期间产生的日志不会丢失） */
+    private void reloadLog() {
+        String snapshot = McpServer.getLogSnapshot();
+        mainHandler.post(() -> {
+            logBuffer.setLength(0);
+            logBuffer.append(snapshot);
+            logText.setText(snapshot.isEmpty() ? getText(R.string.mcp_log_empty) : logBuffer);
+        });
     }
 
     private void appendLog(String line) {
