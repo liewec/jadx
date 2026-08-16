@@ -122,6 +122,13 @@ public final class McpTools {
             isError = true;
             text = "工具执行异常：" + t.getClass().getSimpleName()
                     + (t.getMessage() != null ? ": " + t.getMessage() : "");
+            // EACCES：分区存储权限不足，附上明确的解决指引
+            String msg = t.getMessage();
+            if (msg != null && (msg.contains("EACCES") || msg.contains("Permission denied"))) {
+                text = text + "\n\n解决方法：这是文件访问权限不足。请在手机上打开 Dex 编辑器 "
+                        + "→ 菜单 → MCP 服务页，点击\"授权\"按钮，在系统设置中允许\"所有文件访问\""
+                        + "（Android 11 及以上）后重试。";
+            }
         }
         JsonObject c = new JsonObject();
         c.addProperty("type", "text");
@@ -197,7 +204,20 @@ public final class McpTools {
     private static String loadFile(String path) throws Exception {
         File f = new File(path);
         if (!f.exists()) {
+            // 权限不足时 exists() 同样返回 false（如未授予"所有文件访问"），
+            // 通过父目录不可读区分两种情况，避免误导
+            File parent = f.getParentFile();
+            boolean parentReadable = parent != null && parent.canRead();
+            if (!parentReadable && path.startsWith("/storage/emulated/0")
+                    && !f.canRead()) {
+                throw new ToolException("无权访问该路径（EACCES）：请先在 Dex 编辑器的 MCP 服务页"
+                        + "点击\"授权\"，允许\"所有文件访问\"后重试。路径: " + path);
+            }
             throw new ToolException("文件不存在: " + path);
+        }
+        if (!f.canRead()) {
+            throw new ToolException("无权读取该文件（EACCES）：请先在 Dex 编辑器的 MCP 服务页"
+                    + "点击\"授权\"，允许\"所有文件访问\"后重试。路径: " + path);
         }
         DexLoader dl = DexLoader.getInstance();
         int count = dl.load(f);
@@ -295,7 +315,8 @@ public final class McpTools {
         if (!dir.exists()) throw new ToolException("路径不存在: " + path);
         if (!dir.isDirectory()) throw new ToolException("不是目录: " + path);
         File[] children = dir.listFiles();
-        if (children == null) throw new ToolException("无法读取目录（权限不足？）: " + path);
+        if (children == null) throw new ToolException("无法读取目录（EACCES 权限不足）：请先在 Dex 编辑器"
+                + "的 MCP 服务页点击\"授权\"，允许\"所有文件访问\"后重试。路径: " + path);
         StringBuilder sb = new StringBuilder();
         sb.append("目录 ").append(path).append("（").append(children.length).append(" 项）：\n");
         int n = 0;

@@ -4,11 +4,15 @@ import android.Manifest;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
+import android.provider.Settings;
 import android.text.method.ScrollingMovementMethod;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -45,6 +49,9 @@ public class McpFragment extends Fragment {
     private TextView urlLanText;
     private TextView logText;
     private TextView tutorialText;
+    private LinearLayout permRow;
+    private TextView permText;
+    private Button btnPerm;
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final StringBuilder logBuffer = new StringBuilder();
@@ -68,8 +75,12 @@ public class McpFragment extends Fragment {
         urlLanText = view.findViewById(R.id.mcp_url_lan);
         logText = view.findViewById(R.id.mcp_log_text);
         tutorialText = view.findViewById(R.id.mcp_tutorial_text);
+        permRow = view.findViewById(R.id.mcp_perm_row);
+        permText = view.findViewById(R.id.mcp_perm_text);
+        btnPerm = view.findViewById(R.id.btn_mcp_perm);
         logText.setMovementMethod(new ScrollingMovementMethod());
 
+        btnPerm.setOnClickListener(v -> requestStoragePermission());
         btnStart.setOnClickListener(v -> onStartClicked());
         btnStop.setOnClickListener(v -> {
             McpService.stop(requireContext());
@@ -121,6 +132,7 @@ public class McpFragment extends Fragment {
     }
 
     private void startServiceNow() {
+        refreshPermRow();
         McpService.start(requireContext(), pendingPort);
         // 服务启动是异步的：延迟刷新几次状态（启动成功/失败日志由服务写入）
         mainHandler.postDelayed(this::refreshUi, 300);
@@ -147,9 +159,52 @@ public class McpFragment extends Fragment {
         }
     }
 
+    // ==== 文件访问权限（load_file / list_dir 按路径读取所需） ====
+
+    private final ActivityResultLauncher<String[]> storagePermLauncher =
+            registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(), res ->
+                    refreshPermRow());
+
+    /** 是否已具备按路径读取公共存储（Download 等）的能力 */
+    private boolean hasStorageAccess() {
+        if (Build.VERSION.SDK_INT >= 30) {
+            return Environment.isExternalStorageManager();
+        }
+        return ContextCompat.checkSelfPermission(requireContext(),
+                Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void requestStoragePermission() {
+        if (Build.VERSION.SDK_INT >= 30) {
+            try {
+                // 跳转系统"所有文件访问"授权页，返回后 onResume 刷新状态
+                startActivity(new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                        Uri.parse("package:" + requireContext().getPackageName())));
+            } catch (Exception e) {
+                startActivity(new Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION));
+            }
+        } else {
+            storagePermLauncher.launch(new String[]{
+                    Manifest.permission.READ_EXTERNAL_STORAGE,
+                    Manifest.permission.WRITE_EXTERNAL_STORAGE});
+        }
+    }
+
+    /** 未授权时显示提示行；onResume（从设置返回）与启动服务前都会刷新 */
+    private void refreshPermRow() {
+        boolean ok = hasStorageAccess();
+        permRow.setVisibility(ok ? View.GONE : View.VISIBLE);
+        if (!ok) {
+            permText.setText(Build.VERSION.SDK_INT >= 30
+                    ? R.string.mcp_perm_needed
+                    : R.string.mcp_perm_needed_legacy);
+        }
+    }
+
     @Override
     public void onResume() {
         super.onResume();
+        refreshPermRow();
         refreshUi();
         reloadLog();
         // 重新挂上日志监听（后台期间产生的日志由 reloadLog 从静态缓冲补齐）

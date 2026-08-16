@@ -125,6 +125,9 @@
     <string name="mcp_copied_local">已复制本地地址</string>
     <string name="mcp_copied_lan">已复制局域网地址</string>
     <string name="mcp_log_title">服务日志</string>
+    <string name="mcp_perm_needed">⚠ 未授予"所有文件访问"权限：AI 调用 load_file / list_dir 读取 Download 等目录会报 EACCES。点击"授权"并在系统设置中开启。</string>
+    <string name="mcp_perm_needed_legacy">⚠ 未授予存储权限：AI 调用 load_file / list_dir 读取 Download 等目录会失败。点击"授权"允许。</string>
+    <string name="mcp_perm_grant">授权</string>
     <string name="mcp_log_empty">（暂无日志）</string>
     <string name="mcp_notif_channel">MCP 服务</string>
     <string name="mcp_notif_channel_desc">MCP 服务端前台运行通知</string>
@@ -134,7 +137,7 @@
     <string name="mcp_tutorial_title">使用教程</string>
     <string name="mcp_tutorial_hint">（长按下方教程文字可全选复制）</string>
     <string name="mcp_tutorial_intro">MCP（Model Context Protocol）是 AI 客户端与工具的标准协议。本应用作为 MCP 服务端，把 DEX/APK 分析与编辑能力（15 个工具）开放给 AI：加载文件、浏览类、看 Smali / 反编译 Java、搜索代码、读改 AndroidManifest、替换 APK 资源、检测壳、签名 APK 等。让手机上的 AI 助手（或同局域网的电脑 AI）直接帮你逆向分析。</string>
-    <string name="mcp_tutorial_step1">① 启动服务：设置端口（默认 33333），点击\"启动服务\"，状态变为运行中并显示两个服务地址。前台服务保持联网，切到其他应用也不会中断。</string>
+    <string name="mcp_tutorial_step1">① 启动服务：设置端口（默认 33333），点击\"启动服务\"，状态变为运行中并显示两个服务地址。前台服务保持联网，切到其他应用也不会中断。若页面顶部出现"文件访问权限"提示，请先点击\"授权\"（Android 11+ 需在系统设置中允许\"所有文件访问\"），否则 AI 读取 Download 等目录会报 EACCES。</string>
     <string name="mcp_tutorial_step2">② 选择并复制地址：带 MCP 的 AI 软件与本应用在同一台手机 → 点\"复制\"复制\"本地地址\"（http://127.0.0.1:33333/mcp）；AI 软件在电脑或其他手机上 → 复制\"局域网地址\"（该设备需与手机连同一 Wi-Fi）。</string>
     <string name="mcp_tutorial_step3">③ 添加服务器：在支持 MCP 的 AI 软件（Claude、ChatMCP、Cursor 等）的 MCP 设置中新增服务器，类型选 \"Streamable HTTP\"（或 \"HTTP\"），粘贴刚才复制的地址；老版本客户端选 \"SSE\" 类型，地址结尾把 /mcp 换成 /sse。</string>
     <string name="mcp_tutorial_step4">④ 开始对话：连接成功后对 AI 说，例如：\"加载 /storage/emulated/0/Download/app.apk 并分析它的入口 Activity\"、\"把 targetSdkVersion 改成 34 并重新签名\"、\"反编译 com.example.MainActivity 给我看代码\"。AI 会自动调用 get_status / load_file / read_manifest / decompile_class / sign_apk 等工具。返回本页可在\"服务日志\"回看 AI 的调用记录（含后台使用期间）。</string>

@@ -51,6 +51,35 @@
                 android:text="@string/btn_stop_mcp" />
         </LinearLayout>
 
+        <!-- 文件访问权限（load_file/list_dir 按路径读取所需） -->
+        <LinearLayout
+            android:id="@+id/mcp_perm_row"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingTop="6dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/mcp_perm_text"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/mcp_perm_needed"
+                android:textColor="#E65100"
+                android:textSize="12sp" />
+
+            <Button
+                android:id="@+id/btn_mcp_perm"
+                style="?attr/borderlessButtonStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:minWidth="0dp"
+                android:text="@string/mcp_perm_grant" />
+        </LinearLayout>
+
         <!-- 运行状态 -->
         <TextView
             android:id="@+id/mcp_status_text"
